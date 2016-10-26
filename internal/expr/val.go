@@ -2,7 +2,6 @@ package expr
 
 import (
 	"fmt"
-	"runtime/debug"
 	"strconv"
 
 	"github.com/snadrus/nodb/internal/base"
@@ -85,7 +84,6 @@ func (e *ExpressionBuilder) retcol(s string) E {
 		v, ok := row[s]
 		if !ok {
 			base.Debug("cant find", s, " data avail:", row, e.SrcTables)
-			debug.PrintStack()
 			return nil, fmt.Errorf("Cannot find column for ref %s", s)
 		}
 		return v, nil
