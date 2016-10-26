@@ -1,5 +1,3 @@
-package nodb
-
 /*
 NoDB: SQL Array comprehensions in GoLang.
 
@@ -43,3 +41,4 @@ See the unit tests for more examples.
 The goal is to increase ANSI SQL compatibility as much as anyone today would use.
 Then the features will grow around making it more applicable.
 */
+package nodb
