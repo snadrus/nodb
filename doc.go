@@ -40,5 +40,7 @@ An error state does not guarantee an empty result slice.
 See the unit tests for more examples.
 The goal is to increase ANSI SQL compatibility as much as anyone today would use.
 Then the features will grow around making it more applicable.
+
+Read the README on http://www.github.com/snadrus/nodb for more informaiton.
 */
 package nodb
