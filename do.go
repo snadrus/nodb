@@ -13,7 +13,8 @@ import (
 // Use it to name tables & custom functions
 type Obj map[string]interface{}
 
-// Do an SQL 'query' against 'src' and (copy) results into 'result'
+// Do an SQL 'query' against 'src' entries and (copy) results into 'result'
+// See doc.go for more details. src points to tables ([]AnyStruct) and functions
 func Do(query string, result interface{}, src Obj) error {
 	tree, err := sqlparser.Parse(query)
 	if err != nil {
