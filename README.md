@@ -1,43 +1,30 @@
 <img src="http://snadrus.github.io/logo-nodb.png" width="400">
-# nodb
 SQL array comprehensions in Go. [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/snadrus/nodb)        [![Build Status](http://img.shields.io/travis/snadrus/nodb.svg?style=flat-square)](https://travis-ci.org/snadrus/nodb)     [![Coverage Status](https://coveralls.io/repos/github/snadrus/nodb/badge.svg?branch=master)](https://coveralls.io/github/snadrus/nodb?branch=master)    [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=C6284X93YL4WA)
 
-Featuring:
-- faster development than in-memory DBs: no table creation, inserts, IPC, & de/serialization
-  *  Saving dev time & run time.
-
-- Your table rows (structs) can contain time.Time & other structs with privates
-  *  And you can use your own functions on them
+- Development faster than in-memory DBs: no table creation, inserts, IPC, & de/serialization
 - Sort: "ORDER BY X, Y DESC, Z" is a dream vs Go's sort API
-- Think in 1 manipulation language for all your data needs
+- Every struct is a table row. A slice of them is a table. 
+- Pass in & use any func. time.Time is your time format.
 
- Uses:
-- No joins policy or Cassandra?
-  *  Don't lose your rich API, do it locally.
-- Sort By X Then By Y?
-  * Yes, it works right & uses Go's sort.
-- Complex Operations?
-  * Express them easily in the most recognized query language.
-- Caching some data?
-  * And want to join your cache in a sql call? Here's your chance.
-- Building own DB?
-  * Use this front-end and just provide ingestion & locking.
+Benefitting:
+- no-Join policy scenarios (like Cassandra)
+- When you know the SQL solution
+- queries against in-memory caches
+- Building your own DB.
 
- API:
-    It's simple, 1 function only:
-
-    nodb.Do("SQL STATEMENT", &resultSliceOfAnyStruct,
+Only 1 function:
+    err := nodb.Do("SQL STATEMENT", &resultSliceOfAnyStruct,
      nodb.Obj{"table1": sliceOfAnyStruct, "table2": sliceOfAnyStruct, "unixToTime": time.Unix})
 
      If no error, the results' structs will contain shallow-copies of their elements.
-- Why are results not saved?
-  * Results reach the destination by name. Use an "AS" to select the destination field.
 
 FAQ:
 - Dual License
   * Select either GPL or purchase a commercial license.
+- Why are results not saved?
+  * Results reach the destination by name. Use an "AS" to select the destination field.
 - How compatible?
-  * The parts of ANSI SQL most used. Queries execute right or will error. Case-insensitive query of public members. See TODOs for most serious omissions
+  * Common parts of ANSI SQL. Queries execute right or return error. Case-insensitive query of public members. See TODOs for most serious omissions
 - How extensible?
   * Add functions per query Obj or globally (expr.FuncMap) use them anywhere in the query.
 - How can I help?
@@ -50,7 +37,7 @@ FAQ:
 - How fast really?
   * It is in-memory & pipelined for multicore, but Go loops are faster today. It's focussed on correctness first, query planning second.
 - Out of Memory?
-  * Object copying isn't light & neither is GROUPBY & ORDERBY.
+  * Object copying isn't light & neither is GROUPBY & ORDERBY. 
 
 Design: (the first?) 100% Go SQL engine
   External libs for SQL parsing and interface{} evaluating.
