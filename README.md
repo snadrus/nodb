@@ -6,17 +6,27 @@ SQL array comprehensions in Go. [![GoDoc](http://img.shields.io/badge/go-documen
 - Every struct is a table row. A slice of them is a table. 
 - Pass in & use any func. time.Time is your time format.
 
+Only 1 function! Example:
+
+     err := nodb.Do(
+     "SELECT *, uTime(t2.ut) AS t " +
+     "FROM table1 JOIN table2 AS t2 ON table1.id = t1_id", 
+     &resultSliceOfAnyStruct,
+     nodb.Obj{
+        "table1": sliceOfAnyStruct, 
+        "table2": sliceOfAnyStruct, 
+        "uTime": time.Unix
+        }
+     )
+
+     If no error, the results' structs will contain shallow-copies of their elements.
+
+
 Benefitting:
 - no-Join policy scenarios (like Cassandra)
 - When you know the SQL solution
 - queries against in-memory caches
 - Building your own DB.
-
-Only 1 function:
-    err := nodb.Do("SQL STATEMENT", &resultSliceOfAnyStruct,
-     nodb.Obj{"table1": sliceOfAnyStruct, "table2": sliceOfAnyStruct, "unixToTime": time.Unix})
-
-     If no error, the results' structs will contain shallow-copies of their elements.
 
 FAQ:
 - Dual License
