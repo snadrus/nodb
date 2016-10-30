@@ -169,6 +169,22 @@ func Test_GroupBy4(t *testing.T) {
 	})
 }
 
+type rs struct {
+	Ct  int
+	Max float64
+	Min float64
+	Avg float64
+}
+
+func Test_GroupBy5(t *testing.T) {
+	res := []rs{}
+	Convey("basic aggregates", t, func() {
+		err := Do("SELECT COUNT(*) AS ct, MAX(A) AS max, MIN(A) as min, AVG(a) as avg FROM src", &res, Obj{"src": srcG})
+		So(err, ShouldBeNil)
+		So(res, ShouldResemble, []rs{{5, 5.0, 1.0, 3.0}})
+	})
+}
+
 func Test_lateadd(t *testing.T) {
 	Convey("lateAddIgnoredByIterator", t, func() {
 		res := []int{}
@@ -210,4 +226,33 @@ func Test_join(t *testing.T) {
 			So(result, ShouldResemble, []Foo{{2, "B"}, {3, "C"}, {4, ""}})
 		})
 	*/
+}
+
+func Test_Bools1(t *testing.T) {
+	Convey("in/not-in", t, func() {
+		res := []Foo{}
+		So(Do("SELECT * FROM srcG WHERE A IN (1, 3, 5) AND A NOT IN (1,2)",
+			&res,
+			Obj{"srcG": srcG}), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{3, "hello"}, {5, "hello"}})
+	})
+}
+func Test_Bools2(t *testing.T) {
+	Convey("like", t, func() {
+		res := []Foo{}
+		So(Do("SELECT * FROM srcG WHERE B LIKE 'he%'",
+			&res,
+			Obj{"srcG": srcG}), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{1, "hello"}, {3, "hello"}, {5, "hello"}})
+	})
+}
+
+func Test_Func1(t *testing.T) {
+	Convey("function all", t, func() {
+		res := []Foo{}
+		So(Do("SELECT A, SUBSTR(UPPER(B), 1, 3) AS B FROM srcG WHERE A = 1",
+			&res,
+			Obj{"srcG": srcG}), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{1, "ELL"}})
+	})
 }

@@ -88,7 +88,7 @@ func (e *ExpressionBuilder) MakeCompare(tree *sqlparser.ComparisonExpr) (E, erro
 	case sqlparser.AST_NOT_IN:
 		return makeNot(contains(right, left)), nil
 	case sqlparser.AST_LIKE:
-		op = "~="
+		op = "=~"
 		right = likeExpr(right)
 	case sqlparser.AST_NOT_LIKE:
 		op = "!~"
@@ -119,6 +119,8 @@ func likeExpr(e E) E {
 	}
 }
 
+var eq, _ = govaluate.NewEvaluableExpression("l == r")
+
 func contains(sliceE, itemE E) E {
 	return func(row map[string]interface{}) (val interface{}, err error) {
 		slice, err := sliceE(row)
@@ -138,7 +140,10 @@ func contains(sliceE, itemE E) E {
 		}
 		length := rs.Len()
 		for a := 0; a < length; a++ {
-			if reflect.DeepEqual(rs.Index(a).Interface(), item) {
+			rsIntf := rs.Index(a).Interface()
+
+			v, err := eq.Evaluate(map[string]interface{}{"l": rsIntf, "r": item})
+			if (err == nil && v.(bool)) || reflect.DeepEqual(rsIntf, item) {
 				return true, nil
 			}
 		}

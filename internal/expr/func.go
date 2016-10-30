@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/xwb1989/sqlparser"
 )
@@ -32,13 +33,13 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 			return nil, err
 		}
 		args = append(args, argE)
-		argString += " column" + strconv.Itoa(i)
+		argString += " .column" + strconv.Itoa(i)
 	}
 	if len(args) == 0 {
 		return nil, fmt.Errorf("No arg for func: %s", fe.Name)
 	}
 
-	// TODO allow their own functions (instead of using funcmap)
+	// Allow their own functions (instead of using funcmap)
 	fn, ok := FuncMap[string(fe.Name)]
 	if !ok {
 		fn, ok = e.Obj[string(fe.Name)]
@@ -46,7 +47,9 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 			return nil, fmt.Errorf("Function not found: %s", fe.Name)
 		}
 	}
-	t, _ := template.New("A").Funcs(FuncMap).Parse("{{" + argString + "}}")
+	t, err := template.New("A").Funcs(FuncMap).Parse("{{" + argString + "}}")
+	fmt.Println("argstring", argString, "err:", err)
+
 	return func(row map[string]interface{}) (i interface{}, err error) {
 		templateVars := make(map[string]interface{}, len(args))
 		for i, exp := range args {
@@ -56,6 +59,7 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 			}
 			templateVars["column"+strconv.Itoa(i)] = v
 		}
+		fmt.Println("templateVars:", templateVars)
 		b := bytes.Buffer{}
 		if err := t.Execute(&b, templateVars); err != nil {
 			return nil, err
@@ -76,7 +80,7 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 
 var FuncMap = map[string]interface{}{
 	/* String Functions */
-	"char_length":  func(s string) int { return len(s) },
+	"char_length":  func(s string) int { return utf8.RuneCount([]byte(s)) },
 	"lower":        strings.ToLower,
 	"upper":        strings.ToUpper,
 	"octet_length": func(s string) int { return len([]byte(s)) },
@@ -100,16 +104,16 @@ var FuncMap = map[string]interface{}{
 func stringFuncFind(s, sep string) int {
 	return strings.Index(s, sep)
 }
-func stringFuncSubstr(s string, sArgs ...int) string {
-	if sArgs[0] >= len(s) || sArgs[0] < 0 {
+func stringFuncSubstr(s string, start int, sArgs ...int) string {
+	if start >= len(s) || start < 0 {
 		return ""
 	}
-	end := len(s) - sArgs[0]
-	if len(sArgs) == 2 {
-		if sArgs[1] <= sArgs[0] || sArgs[1] >= len(s) {
-			return ""
-		}
-		end = sArgs[2]
+	if len(sArgs) == 0 {
+		return s[start:]
 	}
-	return s[sArgs[0]:end]
+	end := start + sArgs[0]
+	if end < start {
+		return ""
+	}
+	return s[start:end]
 }

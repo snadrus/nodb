@@ -15,7 +15,13 @@ func (e *ExpressionBuilder) MakeVal(tree sqlparser.ValExpr) (E, error) {
 		v := tree.(sqlparser.StrVal)
 		return retval(string(v), nil), nil
 	case sqlparser.NumVal:
-		return retval(strconv.ParseFloat(string(tree.(sqlparser.NumVal)), 64)), nil
+		str := string(tree.(sqlparser.NumVal))
+		f64, _ := strconv.ParseFloat(str, 64)
+		iSys, _ := strconv.Atoi(str)
+		if float64(iSys) == f64 {
+			return retval(iSys, nil), nil
+		}
+		return retval(f64, nil), nil
 	case sqlparser.ValArg: // "?" solves SQL injection (~ok) & query plan reuse (useless).
 		return nil, fmt.Errorf("ValArg not impl, TODO")
 	case *sqlparser.NullVal:
