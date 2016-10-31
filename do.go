@@ -35,7 +35,7 @@ func Do(query string, result interface{}, src Obj) error {
 // Filter the input using an SQL WHERE content. 1-level-dep copy results.
 // Available: AND, OR, go math symbols, (), Struct Field names, single quotes, single equal
 // ( ID > 5 ) AND !(Name='Bob')
-func Filter(query string, result *[]interface{}, input []interface{}) error {
+func Filter(query string, result interface{}, input interface{}) error {
 	return Do(fmt.Sprintf("SELECT * FROM t0 WHERE %s", query),
-		interface{}(result), Obj{"t0": interface{}(input)})
+		result, Obj{"t0": input})
 }

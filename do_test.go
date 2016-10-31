@@ -256,3 +256,10 @@ func Test_Func1(t *testing.T) {
 		So(res, ShouldResemble, []Foo{{1, "ELL"}})
 	})
 }
+func Test_Filter(t *testing.T) {
+	Convey("filter", t, func() {
+		res := []Foo{}
+		So(Filter("A = 1", &res, srcG), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{1, "hello"}})
+	})
+}

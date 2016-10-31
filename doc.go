@@ -1,3 +1,5 @@
+package nodb
+
 /*
 NoDB: SQL Array comprehensions in GoLang.
 
@@ -43,4 +45,3 @@ Then the features will grow around making it more applicable.
 
 Read the README on http://www.github.com/snadrus/nodb for more informaiton.
 */
-package nodb

@@ -47,8 +47,7 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 			return nil, fmt.Errorf("Function not found: %s", fe.Name)
 		}
 	}
-	t, err := template.New("A").Funcs(FuncMap).Parse("{{" + argString + "}}")
-	fmt.Println("argstring", argString, "err:", err)
+	t, _ := template.New("A").Funcs(FuncMap).Parse("{{" + argString + "}}")
 
 	return func(row map[string]interface{}) (i interface{}, err error) {
 		templateVars := make(map[string]interface{}, len(args))
@@ -59,7 +58,6 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 			}
 			templateVars["column"+strconv.Itoa(i)] = v
 		}
-		fmt.Println("templateVars:", templateVars)
 		b := bytes.Buffer{}
 		if err := t.Execute(&b, templateVars); err != nil {
 			return nil, err

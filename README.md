@@ -2,21 +2,23 @@
 SQL array comprehensions in Go. [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/snadrus/nodb)        [![Build Status](http://img.shields.io/travis/snadrus/nodb.svg?style=flat-square)](https://travis-ci.org/snadrus/nodb)     [![Coverage Status](https://coveralls.io/repos/github/snadrus/nodb/badge.svg?branch=master)](https://coveralls.io/github/snadrus/nodb?branch=master)    [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=C6284X93YL4WA)
 
 - Development faster than in-memory DBs: no table creation, inserts, IPC, & de/serialization
-- Sort: "ORDER BY X, Y DESC, Z" is a dream vs Go's sort API
-- Every struct is a table row. A slice of them is a table. 
+- Sort: "ORDER BY last_name, importance DESC" is a dream vs Go's sort API
+- Every struct is a table row. A slice of them is a table.
 - Pass in & use any func. time.Time is your time format.
 
 Only 1 function! Example:
 
      err := nodb.Do(
-     "SELECT *, uTime(t2.ut) AS t " +
-     "FROM table1 JOIN table2 AS t2 ON table1.id = t1_id", 
-     &resultSliceOfAnyStruct,
-     nodb.Obj{
-        "table1": sliceOfAnyStruct, 
-        "table2": sliceOfAnyStruct, 
-        "uTime": time.Unix
-        }
+       "SELECT *, salutation(gender, last_name, lang) as greeting" +
+       "FROM user JOIN company AS t2 ON user.company_id = t2.id" +
+       "WHERE company.size = 'medium' " +
+       "ORDER BY company.name", 
+       &resultSliceOfAnyStruct,
+       nodb.Obj{
+          "user": userCache,     // A slice of any struct
+          "company": companies, // A slice of any struct
+          "salutation": mySalutationFunc,    // Pass string-returning functions
+          }
      )
 
      If no error, the results' structs will contain shallow-copies of their elements.
@@ -47,7 +49,7 @@ FAQ:
 - How fast really?
   * It is in-memory & pipelined for multicore, but Go loops are faster today. It's focussed on correctness first, query planning second.
 - Out of Memory?
-  * Object copying isn't light & neither is GROUPBY & ORDERBY. 
+  * Object copying isn't light & neither is GROUPBY & ORDERBY.
 
 Design: (the first?) 100% Go SQL engine
   External libs for SQL parsing and interface{} evaluating.
