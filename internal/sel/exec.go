@@ -67,6 +67,7 @@ func doNest(je *joinElement) chainType {
 			}
 			if !joined && je.fullOther { // Left join
 				myMap := rowDup(m)
+				base.Debug("map before nulling:", myMap, "used fields:", je.table.UsedFields)
 				for name := range je.table.UsedFields {
 					myMap[tname+"."+name] = nil
 				}

@@ -217,15 +217,13 @@ func Test_join(t *testing.T) {
 			Obj{"first": left, "second": right}), ShouldBeNil)
 		So(result, ShouldResemble, []Foo{{1, ""}, {2, "X"}, {3, "Y"}})
 	})
-	/*
-		Convey("right", t, func() {
-			result := []Foo{}
-			So(Do("SELECT a, first.b as b FROM first RIGHT JOIN second ON first.A=second.A",
-				&result,
-				Obj{"first": left, "second": right}), ShouldBeNil)
-			So(result, ShouldResemble, []Foo{{2, "B"}, {3, "C"}, {4, ""}})
-		})
-	*/
+	Convey("right", t, func() {
+		result := []Foo{}
+		So(Do("SELECT second.A as a, first.b as b FROM first RIGHT JOIN second ON first.A=second.A",
+			&result,
+			Obj{"first": left, "second": right}), ShouldBeNil)
+		So(result, ShouldResemble, []Foo{{2, "B"}, {3, "C"}, {4, ""}})
+	})
 }
 
 func Test_Bools1(t *testing.T) {

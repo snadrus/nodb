@@ -12,7 +12,7 @@ Only 1 function! Example:
        "SELECT *, salutation(gender, last_name, lang) as greeting" +
        "FROM user JOIN company AS t2 ON user.company_id = t2.id" +
        "WHERE company.size = 'medium' " +
-       "ORDER BY company.name", 
+       "ORDER BY company.name",
        &resultSliceOfAnyStruct,
        nodb.Obj{
           "user": userCache,     // A slice of any struct
@@ -52,7 +52,7 @@ FAQ:
   * Object copying isn't light & neither is GROUPBY & ORDERBY.
 
 Design: (the first?) 100% Go SQL engine
-  External libs for SQL parsing and interface{} evaluating.
+  Go libs for SQL parsing and interface{} evaluating.
   Native GoLang libs for all else: reflect, sort, template (functions)
   Process:
   - Rich "Rows" are formed of all joined, renamed, calculated data for a source row
@@ -61,19 +61,25 @@ Design: (the first?) 100% Go SQL engine
   - The SELECT rows are mapped back to the destination by name
   Closures are the greatest! The setups return functions that have context.
 
+Lacking, but has easy workarounds:
+    - Single Return (item or struct)
+        worthless unless a different interaction model was in plan
+    - Item as table
+    - []non-struct Query or Return
+    - Union: Just run the 1st query, then the 2nd.
+
 TODO:
 - Find & Fix TODOs in the code.
-- Code coverage
-- Right JOINs (just flip 'em)
+- Code coverage > 80%
 
 - DISTINCT not implemented. It is a group-by with all. Code-savings. BUT select needs to say which it uses. Use new ExpressionBuilder returns & unify that for PLAN.
 
 - NULL (nil) support is wonky at best. Avoid if possible.
-- LIMIT  support
-- UNION  support
-- []non-struct Query or Return
+- LIMIT support
 - Subquries
 - Functions on objects: Hour(t) --> t.Hour()
+
+- OPTIMIZATION: expr.E fault tolerance for OR/AND clauses allowing Per-table elimination of rows without all data available:  A AND B => err AND False ==> False.  A OR B ==> err OR True ==> True.
 
 - OPTIMIZATION: index idea: zeroed index will represent position offset to real table
   values, so all zeroes is "this order". Then we are free to sort using govaluate
@@ -99,9 +105,3 @@ TODO:
 - Joiner: hard-version:
   - if you're an inner loop, consider marking those you skip
   - if unsorted & "equals" join, map or sort
-
-Has easy workarounds:
-  - Right JOINs: Move Right to left (do first)
-  - Single Return (item or struct)
-      worthless unless a different interaction model was in plan
-  - Item as table

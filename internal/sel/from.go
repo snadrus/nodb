@@ -27,10 +27,11 @@ type joinElement struct {
 }
 
 func (f *from) MakeJoinTree(je *sqlparser.JoinTableExpr) (*joinElement, error) {
-	// TODO the ON clause should only map to these 2 tables (alias)
-	//
-	// TODO recurse, collecting names, conditions
-	// TODO elsewhere: determine if condition columns are available
+	// Recurse, collecting names, conditions
+	if je.Join == sqlparser.AST_RIGHT_JOIN { // Swap
+		je.LeftExpr, je.RightExpr = je.RightExpr, je.LeftExpr
+		je.Join = sqlparser.AST_LEFT_JOIN
+	}
 	left, err := f.MakeJoinElement(je.LeftExpr) // ok for joinElement
 	if err != nil {
 		return nil, err
@@ -39,6 +40,7 @@ func (f *from) MakeJoinTree(je *sqlparser.JoinTableExpr) (*joinElement, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO the ON clause should only map to these 2 tables (alias) & should be available
 	cnd, err := f.exprBuilder.ExprToE(je.On)
 	if err != nil {
 		return nil, err
@@ -54,13 +56,23 @@ func (f *from) MakeJoinTree(je *sqlparser.JoinTableExpr) (*joinElement, error) {
 		return nil, errors.New("Straight Join not supported.")
 	case sqlparser.AST_LEFT_JOIN:
 		right.fullOther = true
-	case sqlparser.AST_RIGHT_JOIN:
-		// SWAP  left/right? but then I must swap subtree listing for startup
-		return nil, errors.New("Right Join not supported.")
 	case sqlparser.AST_JOIN:
 	}
 	return right, nil
 }
+
+/*
+Normal 3-way join:  a join b left join c
+   T
+	1 T
+	  23
+
+Paren 3-way join: a join (b left join c)
+   T
+	1 (T)
+    2 3   Still added, but T23 (#2) needs no .From AND T23 result
+*/
+
 func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) {
 	switch table.(type) {
 	case *sqlparser.AliasedTableExpr:
