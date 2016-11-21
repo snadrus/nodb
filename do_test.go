@@ -75,6 +75,7 @@ func Test_complex(t *testing.T) {
 		src := []time.Time{time.Now(), time.Now()}
 		results := []time.Time{}
 		err := Do("SELECT * FROM src", &results, Obj{"src": src})
+		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldResemble, "DoSelect error: SELECT * FROM src fails for private fields. Wrap src's struct in another struct")
 	})
 }

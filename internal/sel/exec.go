@@ -1,6 +1,7 @@
 package sel
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/kr/pretty"
@@ -25,7 +26,7 @@ func rowDup(m row) row {
 	}
 	return myMap
 }
-func doNest(je *joinElement) chainType {
+func doNest(je *joinElement, ctx context.Context) chainType {
 	ch := make(chainType, 5)
 	je.resultChan = ch
 	go func() {
@@ -61,7 +62,11 @@ func doNest(je *joinElement) chainType {
 				}
 				if r.(bool) {
 					base.Debug("JOIN Condition true for ", myMap)
-					ch <- myMap
+					select {
+					case ch <- myMap:
+					case <-ctx.Done():
+						return
+					}
 					joined = true
 				}
 			}
@@ -72,7 +77,11 @@ func doNest(je *joinElement) chainType {
 					myMap[tname+"."+name] = nil
 				}
 				base.Debug("Left Join row detected for", myMap)
-				ch <- myMap
+				select {
+				case ch <- myMap:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()

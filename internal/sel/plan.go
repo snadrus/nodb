@@ -1,6 +1,7 @@
 package sel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -16,9 +17,10 @@ type plan struct {
 	src            base.SrcTables
 	GroupProcessor *groupProcessor
 	so             *orderBySortable
+	context.Context
 }
 
-func planQuery(out rowMaker, joins []*joinElement, whereCond condition, src base.SrcTables) (*plan, error) {
+func planQuery(out rowMaker, joins []*joinElement, whereCond condition, src base.SrcTables, ctx context.Context) (*plan, error) {
 	for _, t := range joins {
 		tv := reflect.ValueOf(t.table.Table)
 		if tv.Kind() != reflect.Slice {
@@ -29,6 +31,7 @@ func planQuery(out rowMaker, joins []*joinElement, whereCond condition, src base
 		rowMaker: out,
 		joins:    joins,
 		where:    whereCond,
+		Context:  ctx,
 	}, nil
 }
 
@@ -38,7 +41,7 @@ type chainType chan row
 // Run a query plan
 func (p *plan) Run(ch chan GetChanError) {
 	for _, t := range p.joins {
-		doNest(t) // x*y strategy. Better ones later
+		doNest(t, p.Context) // x*y strategy. Better ones later
 	}
 
 	if p.GroupProcessor != nil {
@@ -93,9 +96,9 @@ func toDevNull(ch chan row) {
 }
 
 // MakeGroupBy takes []Val maker and aggregate-possible HAVING bool.
-func (p *plan) MakeGroupBy(gb expr.E, SelectExpr *expr.ExpressionBuilder, HavingExpr *expr.ExpressionBuilder, outrow aggRowMaker) error {
+func (p *plan) MakeGroupBy(gb expr.E, SelectExpr *expr.ExpressionBuilder, HavingExpr *expr.ExpressionBuilder, outrow aggRowMaker, ctx context.Context) error {
 	// Also, SELECT expr aggregates needs dealing-with.
-	p.GroupProcessor = makeGroupBy(gb, SelectExpr, HavingExpr, outrow) // save it
+	p.GroupProcessor = makeGroupBy(gb, SelectExpr, HavingExpr, outrow, ctx) // save it
 	return errors.New("MakeGroupBy TODO")
 }
 

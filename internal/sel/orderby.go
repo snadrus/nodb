@@ -14,7 +14,7 @@ type lessFunc func(left, right row) bool
 
 type fullAndFinal struct {
 	row
-	final row
+	final []interface{}
 }
 type orderBySortable struct {
 	r []fullAndFinal
@@ -28,7 +28,7 @@ func (s *orderBySortable) Less(i, j int) bool {
 	return s.lessFunc(s.r[i].row, s.r[j].row)
 }
 
-func (s *orderBySortable) AddRow(full, final row) {
+func (s *orderBySortable) AddRow(full row, final []interface{}) {
 	base.Debug("orderby gets row:", final)
 	s.r = append(s.r, fullAndFinal{full, final})
 }

@@ -1,6 +1,7 @@
 package sel
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"sync"
@@ -43,7 +44,8 @@ func makeGroupBy(
 	gb expr.E,
 	SelectBuilder *expr.ExpressionBuilder,
 	HavingBuilder *expr.ExpressionBuilder,
-	outrow aggRowMaker) *groupProcessor {
+	outrow aggRowMaker,
+	ctx context.Context) *groupProcessor {
 	gp := groupProcessor{Input: make(chan row), Wg: &sync.WaitGroup{}}
 	gp.Wg.Add(1)
 	groups := map[string]aggs{}
@@ -69,14 +71,22 @@ func makeGroupBy(
 					}
 				}
 				if err != nil {
-					gp.out <- GetChanError{err: err}
+					select {
+					case gp.out <- GetChanError{err: err}:
+					case <-ctx.Done():
+						return
+					}
 					go toDevNull(gp.Input)
 					return
 				}
 			}
 			keyB, err := json.Marshal(v) // Serialize it
 			if err != nil {
-				gp.out <- GetChanError{err: err}
+				select {
+				case gp.out <- GetChanError{err: err}:
+				case <-ctx.Done():
+					return
+				}
 				go toDevNull(gp.Input)
 				return
 			}
@@ -98,39 +108,57 @@ func makeGroupBy(
 		finRend := func(sa *expr.AggGroup) bool {
 			sr, err := outrow(sa)
 			if err != nil {
-				gp.out <- GetChanError{err: err}
+				select {
+				case gp.out <- GetChanError{err: err}:
+				case <-ctx.Done():
+				}
 				return false
 			}
 			if gp.so != nil {
 				gp.so.AddRow(sa.TokenRow, sr)
 			} else {
-				gp.out <- GetChanError{sr, nil}
+				select {
+				case gp.out <- GetChanError{sr, nil}:
+				case <-ctx.Done():
+					return false
+				}
 			}
 			return true
 		}
 		if HavingBuilder != nil {
 			for _, gr := range groups {
 				// MUST render the select results if we use those fields
-				var sr map[string]interface{}
+				var sr []interface{}
 				if havingNeedsSelectFields {
 					var err error
 					sr, err = outrow(gr.selectAgg)
 					if err != nil {
-						gp.out <- GetChanError{err: err}
+						select {
+						case gp.out <- GetChanError{err: err}:
+						case <-ctx.Done():
+						}
 						return
 					}
 				}
 				gr.havingAgg.TokenRow = gr.selectAgg.TokenRow
 				base.Debug("selectTokenRow", gr.selectAgg.TokenRow)
 				if b, err := gr.havingAgg.RenderExpression(HavingBuilder.Expr); err != nil {
-					gp.out <- GetChanError{err: err}
+					select {
+					case gp.out <- GetChanError{err: err}:
+					case <-ctx.Done():
+					}
 					return
 				} else if b.(bool) {
 					if havingNeedsSelectFields {
 						if gp.so != nil {
 							gp.so.AddRow(gr.selectAgg.TokenRow, sr)
 						} else {
-							gp.out <- GetChanError{sr, nil}
+							select {
+							case gp.out <- GetChanError{sr, nil}:
+							case <-ctx.Done():
+								return
+							}
+
 						}
 					} else if !finRend(gr.selectAgg) {
 						return

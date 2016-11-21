@@ -9,17 +9,18 @@ import (
 	"github.com/xwb1989/sqlparser"
 )
 
-type rowMaker func(srcRow map[string]interface{}) (outRow map[string]interface{}, e error)
-type aggRowMaker func(agg *expr.AggGroup) (outRow map[string]interface{}, e error)
+type rowMaker func(srcRow map[string]interface{}) (outRow []interface{}, e error)
+type aggRowMaker func(agg *expr.AggGroup) (outRow []interface{}, e error)
 
 type getInstructions struct {
-	E            expr.E
 	as           string
+	E            expr.E
 	addableToRow bool
 }
 
-func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMaker, aggRowMaker, error) {
+func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMaker, aggRowMaker, []string, error) {
 	var itemsToGet = []getInstructions{}
+	var colNames []string
 	avoidDupe := map[string]bool{}
 	selTbl := base.SrcTable{
 		Name:       "1Select", //impossible
@@ -34,7 +35,7 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 			if tname != nil {
 				t0, ok := builder.SrcTables[string(tname)] // get table from map
 				if !ok {
-					return nil, nil, fmt.Errorf("Invalid tablename %s", tname)
+					return nil, nil, nil, fmt.Errorf("Invalid tablename %s", tname)
 				}
 				tmpSet = base.SrcTables{string(tname): t0}
 			}
@@ -44,7 +45,7 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 				}
 				reflect.TypeOf(tbl.Table).Elem().NumField() // ONLY for []STRUCT{}
 				if tbl.HasPrivateFields {
-					return nil, nil, fmt.Errorf("SELECT * FROM %s fails for private fields. Wrap %s's struct in another struct", tbl.Name, tbl.Name)
+					return nil, nil, nil, fmt.Errorf("SELECT * FROM %s fails for private fields. Wrap %s's struct in another struct", tbl.Name, tbl.Name)
 				}
 				for _, fname := range tbl.Fields {
 					if _, ok := avoidDupe[fname]; ok {
@@ -53,6 +54,7 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 					avoidDupe[fname] = true
 					tbl.UsedFields[fname] = true
 					func(fullname string) {
+						colNames = append(colNames, fname)
 						itemsToGet = append(itemsToGet, getInstructions{
 							as: fname,
 							E: func(row map[string]interface{}) (interface{}, error) {
@@ -80,13 +82,14 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 			avoidDupe[eAs] = true
 			expE, err := builder.ExprToE(exp2.Expr)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			addableToRow := false
 			if len(eAs) > 0 { // add to src table for GROUPBY, HAVING, ORDERBY
 				selTbl.Fields = append(selTbl.Fields, eAs)
 				addableToRow = true
 			}
+			colNames = append(colNames, eAs)
 			itemsToGet = append(itemsToGet, getInstructions{
 				as:           eAs,
 				E:            expE,
@@ -95,15 +98,16 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 		}
 	}
 
-	r := func(srcRow map[string]interface{}) (outRow map[string]interface{}, e error) {
-		outRow = make(map[string]interface{})
-		for _, toGet := range itemsToGet {
+	colCount := len(itemsToGet)
+	r := func(srcRow map[string]interface{}) (outRow []interface{}, e error) {
+		outRow = make([]interface{}, colCount)
+		for i, toGet := range itemsToGet {
 			v, err := toGet.E(srcRow)
 			if err != nil {
 				return nil, err
 			}
-			base.Debug("will call ", v, " as ", toGet.as, " from ", srcRow)
-			outRow[toGet.as] = v
+			base.Debug("will call ", v, " as ", i, " from ", srcRow)
+			outRow[i] = v
 			if toGet.addableToRow {
 				if _, ok := selTbl.UsedFields[toGet.as]; ok {
 					base.Debug("sel adding 1Select.", toGet.as, "=", v)
@@ -115,19 +119,19 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 	}
 
 	// aggregates involved
-	rAgg := func(agg *expr.AggGroup) (outRow map[string]interface{}, e error) {
-		outRow = make(map[string]interface{})
-		for _, toGet := range itemsToGet {
+	rAgg := func(agg *expr.AggGroup) (outRow []interface{}, e error) {
+		outRow = make([]interface{}, colCount)
+		for i, toGet := range itemsToGet {
 			v, err := agg.RenderExpression(toGet.E)
 			if err != nil {
 				return nil, err
 			}
-			base.Debug("will call ", v, " as ", toGet.as)
-			outRow[toGet.as] = v
+			base.Debug("will call ", v, " as ", i)
+			outRow[i] = v
 
 			if toGet.addableToRow {
 				_, ok := selTbl.UsedFields[toGet.as]
-				base.Debug("lets add ", toGet.as, "val", v, ". Is used?", ok)
+				base.Debug("lets add ", i, "val", v, ". Is used?", ok)
 				if ok {
 					agg.TokenRow["1Select."+toGet.as] = v
 				}
@@ -138,7 +142,7 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 
 	builder.SrcTables["1Select"] = &selTbl
 
-	return r, rAgg, nil
+	return r, rAgg, colNames, nil
 }
 
 func selRemoveNamedItemsTable(sourceTables base.SrcTables) {

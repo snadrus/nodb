@@ -1,8 +1,11 @@
 package sel
 
 import (
+	"context"
+	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/mitchellh/mapstructure"
@@ -14,10 +17,56 @@ import (
 // Obj conveys "table data" as Do's 3rd arg
 type Obj map[string]interface{}
 
+type Rows struct {
+	colNamesCh    chan []string
+	colNamesCache []string
+	ch            chan GetChanError
+	cancel        context.CancelFunc
+}
+
+func DoAry(tree *sqlparser.Select, src Obj, ctx context.Context) (driver.Rows, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	ch, colNamesCh := GetChan(tree, src, ctx)
+	return &Rows{
+		colNamesCh: colNamesCh,
+		ch:         ch,
+		cancel:     cancel,
+	}, nil
+}
+
+func (r *Rows) Columns() []string {
+	if r.colNamesCache == nil {
+		base.Debug("colNamesCache getting populated")
+		r.colNamesCache = <-r.colNamesCh
+		base.Debug("colNamesCache populated to ", r.colNamesCache, r.colNamesCache == nil)
+	}
+	return r.colNamesCache
+}
+
+func (r *Rows) Close() error {
+	r.cancel()
+	return nil
+}
+
+func (r *Rows) Next(dest []driver.Value) error {
+	chanError, ok := <-r.ch
+	if chanError.err != nil {
+		r.cancel()
+		return chanError.err
+	}
+	if !ok {
+		return io.EOF
+	}
+	for i, v := range chanError.item {
+		dest[i] = v
+	}
+	return nil
+}
+
 // Do SELECT
 func Do(tree *sqlparser.Select, result interface{}, src Obj) error {
-	ch := GetChan(tree, src)
-
+	ch, chColNames := GetChan(tree, src, context.Background())
+	var colNames []string
 	rt := reflect.ValueOf(result)
 	if rt.Kind() != reflect.Ptr {
 		return fmt.Errorf("Result must be a pointer. TODO: allow single rows")
@@ -43,7 +92,14 @@ func Do(tree *sqlparser.Select, result interface{}, src Obj) error {
 		case map[string]interface{}:
 			rSlice.Set(reflect.Append(rSlice, reflect.ValueOf(complex.item)))
 		default:
-			mapstructure.Decode(complex.item, v.Interface())
+			tmp := make(map[string]interface{})
+			if colNames == nil {
+				colNames = <-chColNames
+			}
+			for i, v := range complex.item {
+				tmp[colNames[i]] = v
+			}
+			mapstructure.Decode(tmp, v.Interface())
 			rSlice.Set(reflect.Append(rSlice, reflect.Indirect(v)))
 		}
 	}
@@ -54,15 +110,16 @@ func Do(tree *sqlparser.Select, result interface{}, src Obj) error {
 
 // GetChanError is the GetChan return type
 type GetChanError struct {
-	item map[string]interface{}
+	item []interface{}
 	err  error
 }
 
 type condition expr.E
 
 // GetChan for when you want a stream of results
-func GetChan(tree *sqlparser.Select, src Obj) chan GetChanError {
+func GetChan(tree *sqlparser.Select, src Obj, ctx context.Context) (chan GetChanError, chan []string) {
 	ch := make(chan GetChanError, 20)
+	chColNames := make(chan []string, 1)
 	go func() {
 		defer close(ch)
 		chReturnSimple := func() error {
@@ -82,12 +139,14 @@ func GetChan(tree *sqlparser.Select, src Obj) chan GetChanError {
 
 			selectBuilder := WhereBuilder.Dup()
 			selectBuilder.AllowAggregates()
-			outputTypes, aggOutputer, err := doSelect(tree.SelectExprs, selectBuilder)
+
+			outputTypes, aggOutputer, colNames, err := doSelect(tree.SelectExprs, selectBuilder)
 			if err != nil {
 				return fmt.Errorf("DoSelect error: %v", err)
 			}
+			chColNames <- colNames
 
-			plan, err := planQuery(outputTypes, joins, condition(WhereBuilder.Expr), sourceTables)
+			plan, err := planQuery(outputTypes, joins, condition(WhereBuilder.Expr), sourceTables, ctx)
 			if err != nil {
 				return fmt.Errorf("Plan err: %v", err)
 			}
@@ -106,9 +165,9 @@ func GetChan(tree *sqlparser.Select, src Obj) chan GetChanError {
 						return fmt.Errorf("HAVING expression error: %s", err.Error())
 					}
 
-					plan.MakeGroupBy(groupByExprs, selectBuilder, havingBuilder, aggOutputer)
+					plan.MakeGroupBy(groupByExprs, selectBuilder, havingBuilder, aggOutputer, ctx)
 				} else {
-					plan.MakeGroupBy(groupByExprs, selectBuilder, nil, aggOutputer)
+					plan.MakeGroupBy(groupByExprs, selectBuilder, nil, aggOutputer, ctx)
 				}
 				// TODO FUTURE index on fields of interest & traverse in that order.
 			} else {
@@ -120,7 +179,7 @@ func GetChan(tree *sqlparser.Select, src Obj) chan GetChanError {
 						return []interface{}{}, nil
 					}
 
-					plan.MakeGroupBy(oneBigGroup, selectBuilder, nil, aggOutputer)
+					plan.MakeGroupBy(oneBigGroup, selectBuilder, nil, aggOutputer, ctx)
 				}
 			}
 
@@ -147,5 +206,5 @@ func GetChan(tree *sqlparser.Select, src Obj) chan GetChanError {
 			ch <- GetChanError{nil, err}
 		}
 	}()
-	return ch
+	return ch, chColNames
 }
