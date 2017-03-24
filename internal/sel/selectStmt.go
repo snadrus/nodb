@@ -121,8 +121,9 @@ func GetChan(tree *sqlparser.Select, src Obj, ctx context.Context) (chan GetChan
 	ch := make(chan GetChanError, 20)
 	chColNames := make(chan []string, 1)
 	go func() {
-		defer close(ch)
 		chReturnSimple := func() error {
+			var cancelCtx context.CancelFunc
+			ctx, cancelCtx = context.WithCancel(ctx)
 			sourceTables, joins, err := fromer(tree.From, src)
 			if err != nil {
 				return err
@@ -192,7 +193,44 @@ func GetChan(tree *sqlparser.Select, src Obj, ctx context.Context) (chan GetChan
 				plan.MakeOrderBy(so)
 			}
 
-			if tree.Limit != nil || tree.Lock != "" || tree.Distinct != "" {
+			if tree.Limit != nil {
+				out := ch
+				ch = make(chan GetChanError)
+				offsetI, rowCtI, err := tree.Limit.Limits()
+				if err != nil {
+					return err
+				}
+				go func() {
+					defer close(out)
+					done := ctx.Done()
+					if offsetI != nil {
+						for a := 0; a < offsetI.(int); a++ {
+							select {
+							case <-ch:
+							case <-done:
+								return
+							}
+						}
+					}
+					var v GetChanError
+					var ok bool
+					if rowCtI != nil {
+						for a := int64(0); a < rowCtI.(int64); a++ {
+							select {
+							case <-done:
+								return
+							case v, ok = <-ch: // "out" closed automatically
+								if !ok {
+									return
+								}
+								out <- v
+							}
+						}
+					}
+					cancelCtx()
+				}()
+			}
+			if tree.Lock != "" || tree.Distinct != "" {
 				return errors.New("No support for Limit, Lock, or Distinct")
 			}
 
@@ -201,10 +239,11 @@ func GetChan(tree *sqlparser.Select, src Obj, ctx context.Context) (chan GetChan
 			plan.Run(ch)
 			return nil
 		}
-		err := chReturnSimple()
+		err := chReturnSimple() // easier err handling
 		if err != nil {
 			ch <- GetChanError{nil, err}
 		}
+		close(ch) //Lets CH redefined by Limit
 	}()
 	return ch, chColNames
 }

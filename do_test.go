@@ -39,6 +39,19 @@ func Test_Easiest(t *testing.T) {
 		So(results, ShouldResemble, []onlyA{{1}, {2}})
 	})
 }
+func Test_Limit(t *testing.T) {
+	src := []Foo{{1, "hello"}, {2, "world"}, {3, "foo"}}
+	Convey("limit", t, func() {
+		results := []onlyA{}
+		So(Do("SELECT * FROM src LIMIT 2", &results, Obj{"src": src}), ShouldBeNil)
+		So(results, ShouldResemble, []onlyA{{1}, {2}})
+	})
+	Convey("limit over", t, func() {
+		results := []onlyA{}
+		So(Do("SELECT * FROM src LIMIT 4", &results, Obj{"src": src}), ShouldBeNil)
+		So(results, ShouldResemble, []onlyA{{1}, {2}, {3}})
+	})
+}
 
 type ADC struct {
 	A int

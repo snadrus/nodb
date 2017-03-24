@@ -3,8 +3,6 @@ package sel
 import (
 	"context"
 	"errors"
-	"fmt"
-	"reflect"
 
 	"github.com/snadrus/nodb/internal/base"
 	"github.com/snadrus/nodb/internal/expr"
@@ -21,12 +19,6 @@ type plan struct {
 }
 
 func planQuery(out rowMaker, joins []*joinElement, whereCond condition, src base.SrcTables, ctx context.Context) (*plan, error) {
-	for _, t := range joins {
-		tv := reflect.ValueOf(t.table.Table)
-		if tv.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("not slice of rows")
-		}
-	}
 	return &plan{
 		rowMaker: out,
 		joins:    joins,
@@ -75,7 +67,11 @@ func (p *plan) Run(ch chan GetChanError) {
 			if p.so != nil {
 				p.so.AddRow(res, finalRow)
 			} else {
-				ch <- GetChanError{finalRow, err}
+				select {
+				case ch <- GetChanError{finalRow, err}:
+				case <-p.Context.Done():
+
+				}
 			}
 		} else {
 			p.GroupProcessor.Input <- res

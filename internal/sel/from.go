@@ -100,20 +100,21 @@ func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) 
 			}
 
 			mySrcTable := base.SrcTable{
-				Table:      tdata,
+				//Table:      tdata,
 				Name:       name,
 				UsedFields: map[string]bool{},
 			}
 
 			vo := reflect.ValueOf(tdata)
-			if vo.Kind() != reflect.Slice {
-				return nil, fmt.Errorf("%s is not slice. TODO wrap individuals/chan", string(name))
-			}
-			if vo.Len() == 0 {
-				return nil, fmt.Errorf("%s is empty", string(name))
-			}
-			if vo.Index(0).Kind() != reflect.Struct {
-				return nil, fmt.Errorf("%s doesnt ref a struct", string(name))
+			kind := vo.Kind()
+			if kind == reflect.Slice && vo.Index(0).Kind() == reflect.Struct {
+				mySrcTable.Table = base.NewSliceOfStructRP(tdata)
+			} else if kind == reflect.Struct {
+				s := reflect.MakeSlice(reflect.SliceOf(vo.Type()), 1, 1)
+				s.Index(0).Set(vo)
+				mySrcTable.Table = base.NewSliceOfStructRP(s.Interface())
+			} else { // TODO support []map[string]interface{} / chan
+				return nil, fmt.Errorf("unsupported type for table", string(name))
 			}
 
 			// TODO MAKE SAFER FOR NULLS
@@ -146,6 +147,7 @@ func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) 
 		//}
 
 		// Mixtures of left & right & regular joins with parens are tricky
+		//This needs multiple initial rows
 		return nil, errors.New("Parentheses in JOIN clause not supported. TODO")
 	case *sqlparser.JoinTableExpr:
 		return f.MakeJoinTree(table.(*sqlparser.JoinTableExpr))

@@ -76,24 +76,28 @@ Design: (the first?) 100% Go SQL engine
 
 Lacking, but has easy workarounds:
     - Inputs other than []struct
-    - Union: Just run the 1st query, then the 2nd.
 
 TODO:
-- TODOs in the code.
+- enable parentheses joins. it'll work now.
+
+- Subquries
+--  srcTable.Table ==> interface for getting rows.
+-- Build own structs for results & reuse what we have.
+-- NO: Chan interface{} --> different FROM fork //, different PLAN fork
+
+- Union: Just run the 1st query, then the 2nd. (EASY)
+
+- DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
 
 - NULL (nil) support is wonky at best. Avoid if possible.
 
-- LIMIT support ==> with CTX, should be easy
+- TODOs in the code.
 
-- DISTINCT not implemented. It is mmaped hashes.
-
-- Subquries
--- Chan interface{} --> different FROM fork, different PLAN fork
+- Functions on objects: Hour(t) --> t.Hour()
 
 - DB Proxy (Cassandra or a variety at once)
 -- SubQueries + mmap for JOIN/GROUP intermediaries
 
-- Functions on objects: Hour(t) --> t.Hour()
 
 - OPTIMIZATION: expr.E fault tolerance (error swallowing) for OR/AND clauses allowing Per-table elimination of rows without all data available:  A AND B => err AND False ==> False.  A OR B ==> err OR True ==> True.
 -- THEN: make errored expr.E returns include partial eval.

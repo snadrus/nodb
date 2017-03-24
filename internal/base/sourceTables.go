@@ -6,8 +6,15 @@ import (
 	"strings"
 )
 
+type RowProvider interface {
+	GetInfo() (multiPassCost int)
+	SetConfig(multiPass bool) /* FUTURE: indexes */
+	NextRow() (hasNotLooped bool)
+	GetFields(used map[string]bool, addPrefix string, dest map[string]interface{})
+}
+
 type SrcTable struct {
-	Table            interface{}
+	Table            RowProvider
 	Fields           []string        // All public fields, real case
 	UsedFields       map[string]bool // Fields actually consumed, real case
 	Name             string

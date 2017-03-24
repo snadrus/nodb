@@ -2,12 +2,12 @@ package sel
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/kr/pretty"
 	"github.com/snadrus/nodb/internal/base"
 )
 
+// a fake FROM table to get things going
 func getInitialRow() (chain chan row) {
 	chain = make(chan row, 1)
 	chain <- make(row) // Start the nested for loops
@@ -40,22 +40,19 @@ func doNest(je *joinElement, ctx context.Context) chainType {
 		if je.condition == nil {
 			je.condition = goodCondition
 		}
-		t := reflect.ValueOf(je.table.Table)
-		length := t.Len()
 
 		tname := je.table.Name
 		joined := false
-		base.Debug("DONEST for ", pretty.Sprint(je.table.Table))
+		base.Debug("DONEST for ", pretty.Sprint(tname))
 		// TODO PERF apply flat conditions
 		for m := range prev {
 			// TODO Accuracy Handle Full Join
 			joined = false
-			for i := 0; i < length; i++ { // for every row in my table
+			for je.table.Table.NextRow() { // for every row in my table
 				myMap := rowDup(m)
-				myrow := t.Index(i)
-				for name := range je.table.UsedFields { // copy my useful fields
-					myMap[tname+"."+name] = myrow.FieldByName(name).Interface()
-				}
+
+				je.table.Table.GetFields(je.table.UsedFields, tname+".", myMap)
+
 				r, err := je.condition(myMap)
 				if err != nil {
 					base.Debug("JOIN Error. Should have return path!")

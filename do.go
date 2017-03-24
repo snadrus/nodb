@@ -27,6 +27,8 @@ func Do(query string, result interface{}, src Obj) error {
 	case *sqlparser.Select:
 		err := sel.Do(tree.(*sqlparser.Select), result, sel.Obj(src))
 		return err
+	//case *sqlparser.Union:
+	//	tree.(*sqlparser.Union).
 	default:
 		return fmt.Errorf("Query type not supported")
 	}

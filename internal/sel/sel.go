@@ -24,7 +24,7 @@ func doSelect(s sqlparser.SelectExprs, builder *expr.ExpressionBuilder) (rowMake
 	avoidDupe := map[string]bool{}
 	selTbl := base.SrcTable{
 		Name:       "1Select", //impossible
-		Table:      []interface{}{},
+		Table:      base.NewSliceOfStructRP([]interface{}{}),
 		UsedFields: map[string]bool{},
 	}
 	for _, exp := range s {
