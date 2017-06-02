@@ -24,8 +24,8 @@ func Do(query string, result interface{}, src Obj) error {
 	base.Debug(pretty.Sprint(tree))
 
 	switch tree.(type) {
-	case *sqlparser.Select:
-		err := sel.Do(tree.(*sqlparser.Select), result, sel.Obj(src))
+	case sqlparser.SelectStatement:
+		err := sel.Do(tree.(sqlparser.SelectStatement), result, sel.Obj(src))
 		return err
 	//case *sqlparser.Union:
 	//	tree.(*sqlparser.Union).

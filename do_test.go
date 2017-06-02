@@ -238,6 +238,13 @@ func Test_join(t *testing.T) {
 			Obj{"first": left, "second": right}), ShouldBeNil)
 		So(result, ShouldResemble, []Foo{{2, "B"}, {3, "C"}, {4, ""}})
 	})
+	Convey("union", t, func() { // TODo
+		result := []Foo{}
+		So(Do("SELECT a FROM first UNION SELECT b AS a FROM second",
+			&result,
+			Obj{"first": left, "second": right}), ShouldBeNil)
+		So(result, ShouldResemble, []Foo{{1, ""}, {2, ""}, {3, "C"}, {2, ""}, {3, ""}, {4, ""}})
+	})
 }
 
 func Test_Bools1(t *testing.T) {

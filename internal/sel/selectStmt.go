@@ -24,7 +24,7 @@ type Rows struct {
 	cancel        context.CancelFunc
 }
 
-func DoAry(tree *sqlparser.Select, src Obj, ctx context.Context) (driver.Rows, error) {
+func DoAry(tree sqlparser.SelectStatement, src Obj, ctx context.Context) (driver.Rows, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	ch, colNamesCh := GetChan(tree, src, ctx)
 	return &Rows{
@@ -64,7 +64,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 }
 
 // Do SELECT
-func Do(tree *sqlparser.Select, result interface{}, src Obj) error {
+func Do(tree sqlparser.SelectStatement, result interface{}, src Obj) error {
 	ch, chColNames := GetChan(tree, src, context.Background())
 	var colNames []string
 	rt := reflect.ValueOf(result)
@@ -117,13 +117,43 @@ type GetChanError struct {
 type condition expr.E
 
 // GetChan for when you want a stream of results
-func GetChan(tree *sqlparser.Select, src Obj, ctx context.Context) (chan GetChanError, chan []string) {
+func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (chOut chan GetChanError, colCh chan []string) {
 	ch := make(chan GetChanError, 20)
 	chColNames := make(chan []string, 1)
+	var cancelCtx context.CancelFunc
+	ctx, cancelCtx = context.WithCancel(ctx)
+	switch u := selStmt.(type) {
+	case *sqlparser.Union:
+		if !(u.Type == sqlparser.AST_UNION || u.Type == sqlparser.AST_UNION_ALL) {
+			ch <- GetChanError{nil, errors.New("Simple Union only, TODO")}
+			return ch, chColNames
+		}
+		selStmt = u.Left
+		ch2, _ := GetChan(u.Right, src, ctx)
+		defer func() {
+			chOut = make(chan GetChanError)
+		}()
+		go func() {
+			// add to ch. IF error in either, cancel other
+			select {
+			case v := <-ch:
+				if v.err != nil {
+					cancelCtx()
+				}
+				chOut <- v
+			case v := <-ch2:
+				if v.err != nil {
+					cancelCtx()
+				}
+				chOut <- v
+			}
+		}()
+	}
+	tree := selStmt.(*sqlparser.Select)
+
 	go func() {
 		chReturnSimple := func() error {
-			var cancelCtx context.CancelFunc
-			ctx, cancelCtx = context.WithCancel(ctx)
+
 			sourceTables, joins, err := fromer(tree.From, src)
 			if err != nil {
 				return err
