@@ -78,17 +78,15 @@ Lacking, but has easy workarounds:
     - Inputs other than []struct
 
 TODO:
-- Union: Just run the 1st query, & the 2nd. 
-    Ctx.cancel() @ top-level error-see for full-query error halting.
-    Both write to the same structure, so OK
-
-- enable parentheses joins. 
-    Build a joinElement without a left, but keep its append order
+- Positional extracts: used in subqueries
 
 - Subquries
 --  Setup a subquery return
 -- Build own structs for results & reuse what we have.
 -- NO: Chan interface{} --> different FROM fork //, different PLAN fork
+
+- enable parentheses joins. 
+    Build a joinElement without a left, but keep its append order
 
 - DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
 

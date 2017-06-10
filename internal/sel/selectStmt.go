@@ -131,21 +131,40 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 		selStmt = u.Left
 		ch2, _ := GetChan(u.Right, src, ctx)
 		defer func() {
-			chOut = make(chan GetChanError)
+			chOut = make(chan GetChanError) //ipso-facto replace
 		}()
 		go func() {
+			defer close(chOut)
 			// add to ch. IF error in either, cancel other
-			select {
-			case v := <-ch:
-				if v.err != nil {
-					cancelCtx()
+			drain := func(src chan GetChanError) {
+				for v := range src {
+					if v.err == nil {
+						chOut <- v
+					}
 				}
-				chOut <- v
-			case v := <-ch2:
-				if v.err != nil {
-					cancelCtx()
+				return
+			}
+			for {
+				select {
+				case v, ok := <-ch: // Read Left
+					if !ok {
+						drain(ch2)
+						return
+					}
+					if v.err != nil {
+						cancelCtx()
+					}
+					chOut <- v
+				case v, ok := <-ch2: // Read Right
+					if !ok {
+						drain(ch)
+						return
+					}
+					if v.err != nil {
+						cancelCtx()
+					}
+					chOut <- v
 				}
-				chOut <- v
 			}
 		}()
 	}

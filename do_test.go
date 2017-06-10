@@ -239,11 +239,13 @@ func Test_join(t *testing.T) {
 		So(result, ShouldResemble, []Foo{{2, "B"}, {3, "C"}, {4, ""}})
 	})
 	Convey("union", t, func() { // TODo
+		tmp := []Foo{}
 		result := []Foo{}
-		So(Do("SELECT a FROM first UNION SELECT b AS a FROM second",
-			&result,
+		So(Do("SELECT a FROM first UNION SELECT a FROM second",
+			&tmp,
 			Obj{"first": left, "second": right}), ShouldBeNil)
-		So(result, ShouldResemble, []Foo{{1, ""}, {2, ""}, {3, "C"}, {2, ""}, {3, ""}, {4, ""}})
+		Do("SELECT * from tmp ORDER BY a", &result, Obj{"tmp": tmp})
+		So(result, ShouldResemble, []Foo{{1, ""}, {2, ""}, {2, ""}, {3, ""}, {3, ""}, {4, ""}})
 	})
 }
 
