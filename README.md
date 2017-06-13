@@ -7,19 +7,6 @@ SQL array comprehensions in Go. [![GoDoc](http://img.shields.io/badge/go-documen
 - Every struct is a table row. A slice of them is a table.
 - Pass in & use any func. time.Time is your time format.
 
-DB Driver method:
-
-  import "github.com/snadrus/nodb"
-  ...
-  // Once:
-  nodb.Add("myTable", []ABC{{1, "hello", 1.0}, {2, "db", 2.0}, {3, "world", 3.0}})  
-  connection := sqlx.MustConnect("nodb", "cache")         
-
-  // As-Needed:           
-  var results []ABC
-  err := connection.Select(&results, "SELECT * FROM myTable WHERE C > 1.5")
-  fmt.Println(results) // []ABC{{2, "db", 2.0}, {3, "world", 3.0}}
-
 Only 1 function! Example:
 
      err := nodb.Do(
@@ -38,6 +25,19 @@ Only 1 function! Example:
      If no error, the results' structs will contain shallow-copies of their elements.
 
 
+DB Driver method:
+
+      import "github.com/snadrus/nodb"
+      ...
+      // Once:
+      nodb.Add("myTable", []ABC{{1, "hello", 1.0}, {2, "db", 2.0}, {3, "world", 3.0}})  
+      connection := sqlx.MustConnect("nodb", "cache")         
+
+      // As-Needed:           
+      var results []ABC
+      err := connection.Select(&results, "SELECT * FROM myTable WHERE C > 1.5")
+      fmt.Println(results) // []ABC{{2, "db", 2.0}, {3, "world", 3.0}}
+
 Benefitting:
 - no-Join policy scenarios (like Cassandra)
 - SQL in caches
@@ -45,7 +45,7 @@ Benefitting:
 
 FAQ:
 - Dual License
-  * Select either GPL or purchase a commercial license.
+  * BSD or commercial license.
 - Why are nodb.Do results not saved?
   * Results reach the destination by name. Use an "AS" to select the destination field.
 - How compatible?
