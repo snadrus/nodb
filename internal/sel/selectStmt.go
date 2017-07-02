@@ -14,17 +14,14 @@ import (
 	"github.com/xwb1989/sqlparser"
 )
 
-// Obj conveys "table data" as Do's 3rd arg
-type Obj map[string]interface{}
-
 type Rows struct {
 	colNamesCh    chan []string
 	colNamesCache []string
-	ch            chan GetChanError
+	ch            chan base.GetChanError
 	cancel        context.CancelFunc
 }
 
-func DoAry(tree sqlparser.SelectStatement, src Obj, ctx context.Context) (driver.Rows, error) {
+func DoAry(tree sqlparser.SelectStatement, src base.Obj, ctx context.Context) (driver.Rows, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	ch, colNamesCh := GetChan(tree, src, ctx)
 	return &Rows{
@@ -50,21 +47,21 @@ func (r *Rows) Close() error {
 
 func (r *Rows) Next(dest []driver.Value) error {
 	chanError, ok := <-r.ch
-	if chanError.err != nil {
+	if chanError.Err != nil {
 		r.cancel()
-		return chanError.err
+		return chanError.Err
 	}
 	if !ok {
 		return io.EOF
 	}
-	for i, v := range chanError.item {
+	for i, v := range chanError.Item {
 		dest[i] = v
 	}
 	return nil
 }
 
 // Do SELECT
-func Do(tree sqlparser.SelectStatement, result interface{}, src Obj) error {
+func Do(tree sqlparser.SelectStatement, result interface{}, src base.Obj) error {
 	ch, chColNames := GetChan(tree, src, context.Background())
 	var colNames []string
 	rt := reflect.ValueOf(result)
@@ -77,10 +74,10 @@ func Do(tree sqlparser.SelectStatement, result interface{}, src Obj) error {
 	}
 	unit := rSlice.Type().Elem()
 	for complex := range ch {
-		base.Debug("got", complex.item)
-		if complex.err != nil {
-			base.Debug("got err", complex.err)
-			return complex.err
+		base.Debug("got", complex.Item)
+		if complex.Err != nil {
+			base.Debug("got err", complex.Err)
+			return complex.Err
 		}
 		v := reflect.New(unit)
 
@@ -90,13 +87,13 @@ func Do(tree sqlparser.SelectStatement, result interface{}, src Obj) error {
 
 		switch v.Interface().(type) {
 		case map[string]interface{}:
-			rSlice.Set(reflect.Append(rSlice, reflect.ValueOf(complex.item)))
+			rSlice.Set(reflect.Append(rSlice, reflect.ValueOf(complex.Item)))
 		default:
 			tmp := make(map[string]interface{})
 			if colNames == nil {
 				colNames = <-chColNames
 			}
-			for i, v := range complex.item {
+			for i, v := range complex.Item {
 				tmp[colNames[i]] = v
 			}
 			mapstructure.Decode(tmp, v.Interface())
@@ -108,37 +105,34 @@ func Do(tree sqlparser.SelectStatement, result interface{}, src Obj) error {
 	return nil
 }
 
-// GetChanError is the GetChan return type
-type GetChanError struct {
-	item []interface{}
-	err  error
-}
-
 type condition expr.E
 
+type SubqueryRunnerImpl struct {
+}
+
 // GetChan for when you want a stream of results
-func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (chOut chan GetChanError, colCh chan []string) {
-	ch := make(chan GetChanError, 20)
+func GetChan(selStmt sqlparser.SelectStatement, src base.Obj, ctx context.Context) (chOut chan base.GetChanError, colCh chan []string) {
+	ch := make(chan base.GetChanError, 20)
 	chColNames := make(chan []string, 1)
 	var cancelCtx context.CancelFunc
 	ctx, cancelCtx = context.WithCancel(ctx)
 	switch u := selStmt.(type) {
 	case *sqlparser.Union:
 		if !(u.Type == sqlparser.AST_UNION || u.Type == sqlparser.AST_UNION_ALL) {
-			ch <- GetChanError{nil, errors.New("Simple Union only, TODO")}
+			ch <- base.GetChanError{nil, errors.New("Simple Union only, TODO")}
 			return ch, chColNames
 		}
 		selStmt = u.Left
 		ch2, _ := GetChan(u.Right, src, ctx)
 		defer func() {
-			chOut = make(chan GetChanError) //ipso-facto replace
+			chOut = make(chan base.GetChanError) //ipso-facto replace
 		}()
 		go func() {
 			defer close(chOut)
 			// add to ch. IF error in either, cancel other
-			drain := func(src chan GetChanError) {
+			drain := func(src chan base.GetChanError) {
 				for v := range src {
-					if v.err == nil {
+					if v.Err == nil {
 						chOut <- v
 					}
 				}
@@ -151,7 +145,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 						drain(ch2)
 						return
 					}
-					if v.err != nil {
+					if v.Err != nil {
 						cancelCtx()
 					}
 					chOut <- v
@@ -160,7 +154,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 						drain(ch)
 						return
 					}
-					if v.err != nil {
+					if v.Err != nil {
 						cancelCtx()
 					}
 					chOut <- v
@@ -177,8 +171,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 			if err != nil {
 				return err
 			}
-			WhereBuilder := expr.DefaultBuilder.Dup().Setup(sourceTables, src)
-			WhereBuilder.Obj = src // enable custom functions
+			WhereBuilder := expr.DefaultBuilder.Dup().Setup(sourceTables, src, GetChan)
 
 			if tree.Where != nil {
 				WhereBuilder.Expr, err = WhereBuilder.MakeBool(tree.Where.Expr)
@@ -244,7 +237,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 
 			if tree.Limit != nil {
 				out := ch
-				ch = make(chan GetChanError)
+				ch = make(chan base.GetChanError)
 				offsetI, rowCtI, err := tree.Limit.Limits()
 				if err != nil {
 					return err
@@ -261,7 +254,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 							}
 						}
 					}
-					var v GetChanError
+					var v base.GetChanError
 					var ok bool
 					if rowCtI != nil {
 						for a := int64(0); a < rowCtI.(int64); a++ {
@@ -290,7 +283,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src Obj, ctx context.Context) (c
 		}
 		err := chReturnSimple() // easier err handling
 		if err != nil {
-			ch <- GetChanError{nil, err}
+			ch <- base.GetChanError{nil, err}
 		}
 		close(ch) //Lets CH redefined by Limit
 	}()

@@ -41,6 +41,7 @@ func doBinOp(l E, op *govaluate.EvaluableExpression, r E) E { // candidate for g
 	}
 }
 
+// ExprToE converts a parsed expression into a runnable one. 
 func (e *ExpressionBuilder) ExprToE(tree sqlparser.Expr) (E, error) {
 	bla := tree.(interface{})
 	v, ok := bla.(sqlparser.ValExpr)

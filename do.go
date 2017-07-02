@@ -25,7 +25,7 @@ func Do(query string, result interface{}, src Obj) error {
 
 	switch tree.(type) {
 	case sqlparser.SelectStatement:
-		err := sel.Do(tree.(sqlparser.SelectStatement), result, sel.Obj(src))
+		err := sel.Do(tree.(sqlparser.SelectStatement), result, base.Obj(src))
 		return err
 	//case *sqlparser.Union:
 	//	tree.(*sqlparser.Union).

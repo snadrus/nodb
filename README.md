@@ -39,7 +39,7 @@ DB Driver method:
       fmt.Println(results) // []ABC{{2, "db", 2.0}, {3, "world", 3.0}}
 
 Benefitting:
-- no-Join policy scenarios (like Cassandra)
+- no-Join policy scenarios (like Cassandra): ACID your way. 
 - SQL in caches
 - Building your own DB.
 
@@ -74,21 +74,37 @@ Design: (the first?) 100% Go SQL engine
   - The SELECT rows are mapped back to the destination by name
   Closures are the greatest! The setups return functions that have context.
 
+Recently Added: 
+ - Subqueries in WHERE clause
+
 Lacking, but has easy workarounds:
     - Inputs other than []struct
 
 TODO:
-- Positional extracts: used in subqueries
+-  nodb.Inline(
+  "SELECT customer.Name as Name, customer.Phone AS Phone FROM ",         customers," AS customers JOIN ", 
+  invoice, " AS invoice ON customer.id = invoice.customer_id " +
+  "WHERE invoice.status='PENDING' ")
+  -- HARD: Make it just as efficient: 
+  -- WHERE clause per-table first IF this table is involved in it.
+  -- MAPS for ON relation (presume unique, work if not unique)
 
-- Subquries
---  Setup a subquery return
+- Subquery 
+-- base.rowProvider:  chan interface{} RP: map GetChan to that.
+--  Setup a subquery return:
+      reflect.StructOf([]reflect.StructField{
+        {                       // * the number of fields
+          Name: "A",
+          Type: reflect.TypeOf(interface{}{}),
+        }
+      })
+-- Support FROM.  // WHERE clause subqueries are done
 -- Build own structs for results & reuse what we have.
--- NO: Chan interface{} --> different FROM fork //, different PLAN fork
+
+- DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
 
 - enable parentheses joins. 
     Build a joinElement without a left, but keep its append order
-
-- DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
 
 - NULL (nil) support is wonky at best. Avoid if possible.
 

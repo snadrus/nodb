@@ -31,7 +31,7 @@ type row map[string]interface{}
 type chainType chan row
 
 // Run a query plan
-func (p *plan) Run(ch chan GetChanError) {
+func (p *plan) Run(ch chan base.GetChanError) {
 	for _, t := range p.joins {
 		doNest(t, p.Context) // x*y strategy. Better ones later
 	}
@@ -47,7 +47,7 @@ func (p *plan) Run(ch chan GetChanError) {
 	for res := range joinOutput {
 		ok, err := p.where(res)
 		if err != nil {
-			ch <- GetChanError{nil, err}
+			ch <- base.GetChanError{nil, err}
 			go toDevNull(joinOutput)
 			// TODO clear the goroutine recursion
 			return
@@ -59,7 +59,7 @@ func (p *plan) Run(ch chan GetChanError) {
 		if p.GroupProcessor == nil { // Simple non-agg select only
 			finalRow, err := p.rowMaker(res) // The SELECT processing
 			if err != nil {
-				ch <- GetChanError{nil, err}
+				ch <- base.GetChanError{nil, err}
 				go toDevNull(joinOutput)
 				return
 			}
@@ -68,7 +68,7 @@ func (p *plan) Run(ch chan GetChanError) {
 				p.so.AddRow(res, finalRow)
 			} else {
 				select {
-				case ch <- GetChanError{finalRow, err}:
+				case ch <- base.GetChanError{finalRow, err}:
 				case <-p.Context.Done():
 
 				}

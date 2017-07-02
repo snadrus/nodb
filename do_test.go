@@ -284,3 +284,14 @@ func Test_Filter(t *testing.T) {
 		So(res, ShouldResemble, []Foo{{1, "hello"}})
 	})
 }
+
+func Test_Subquery(t *testing.T) {
+	Convey("Simple Subquery", t, func() {
+		result := []Foo{}
+		So(Do("SELECT a FROM first WHERE first.a IN ("+
+			"SELECT a from second)",
+			&result,
+			Obj{"first": left, "second": right}), ShouldBeNil)
+		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})
+	})
+}

@@ -87,7 +87,7 @@ func (s Stmt) Query(args []driver.Value) (driver.Rows, error) {
 
 	switch tree.(type) {
 	case *sqlparser.Select:
-		return sel.DoAry(tree.(*sqlparser.Select), sel.Obj(cache), s.Context)
+		return sel.DoAry(tree.(*sqlparser.Select), base.Obj(cache), s.Context)
 	default:
 		return nil, fmt.Errorf("Query type not supported")
 	}

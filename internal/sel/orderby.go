@@ -33,15 +33,15 @@ func (s *orderBySortable) AddRow(full row, final []interface{}) {
 	s.r = append(s.r, fullAndFinal{full, final})
 }
 
-func (s *orderBySortable) SortAndOutput(ch chan GetChanError) {
+func (s *orderBySortable) SortAndOutput(ch chan base.GetChanError) {
 	defer func() {
 		if v := recover(); v != nil {
-			ch <- GetChanError{nil, fmt.Errorf("orderby expr eval: %s", v.(error))}
+			ch <- base.GetChanError{nil, fmt.Errorf("orderby expr eval: %s", v.(error))}
 		}
 	}()
 	sort.Sort(s)
 	for _, r := range s.r {
-		ch <- GetChanError{r.final, nil}
+		ch <- base.GetChanError{r.final, nil}
 	}
 }
 

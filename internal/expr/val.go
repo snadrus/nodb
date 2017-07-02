@@ -42,9 +42,10 @@ func (e *ExpressionBuilder) MakeVal(tree sqlparser.ValExpr) (E, error) {
 		ve := sqlparser.ValExprs(v)
 		ave := ([]sqlparser.ValExpr)(ve)
 		return e.MakeSlice(ave)
-	case *sqlparser.Subquery: // Important architecture work needed
+	case *sqlparser.Subquery:
+		return e.SubqueryToList(tree.(*sqlparser.Subquery))
 		return nil, fmt.Errorf("subquery not impl, TODO")
-	case sqlparser.ListArg: // RARE
+	case sqlparser.ListArg: // RARE: A named-list argument
 		return nil, fmt.Errorf("ListArg not impl, TODO")
 	case *sqlparser.BinaryExpr:
 		return e.binaryExpr(tree.(*sqlparser.BinaryExpr))

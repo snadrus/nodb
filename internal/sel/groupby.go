@@ -12,12 +12,12 @@ import (
 
 type groupProcessor struct {
 	Input chan row
-	out   chan GetChanError
+	out   chan base.GetChanError
 	Wg    *sync.WaitGroup
 	so    *orderBySortable
 }
 
-func (g *groupProcessor) SetOutputChan(ch chan GetChanError) {
+func (g *groupProcessor) SetOutputChan(ch chan base.GetChanError) {
 	g.out = ch
 }
 func (g *groupProcessor) SetSortOutput(so *orderBySortable) {
@@ -72,7 +72,7 @@ func makeGroupBy(
 				}
 				if err != nil {
 					select {
-					case gp.out <- GetChanError{err: err}:
+					case gp.out <- base.GetChanError{Err: err}:
 					case <-ctx.Done():
 						return
 					}
@@ -83,7 +83,7 @@ func makeGroupBy(
 			keyB, err := json.Marshal(v) // Serialize it
 			if err != nil {
 				select {
-				case gp.out <- GetChanError{err: err}:
+				case gp.out <- base.GetChanError{Err: err}:
 				case <-ctx.Done():
 					return
 				}
@@ -109,7 +109,7 @@ func makeGroupBy(
 			sr, err := outrow(sa)
 			if err != nil {
 				select {
-				case gp.out <- GetChanError{err: err}:
+				case gp.out <- base.GetChanError{Err: err}:
 				case <-ctx.Done():
 				}
 				return false
@@ -118,7 +118,7 @@ func makeGroupBy(
 				gp.so.AddRow(sa.TokenRow, sr)
 			} else {
 				select {
-				case gp.out <- GetChanError{sr, nil}:
+				case gp.out <- base.GetChanError{sr, nil}:
 				case <-ctx.Done():
 					return false
 				}
@@ -134,7 +134,7 @@ func makeGroupBy(
 					sr, err = outrow(gr.selectAgg)
 					if err != nil {
 						select {
-						case gp.out <- GetChanError{err: err}:
+						case gp.out <- base.GetChanError{Err: err}:
 						case <-ctx.Done():
 						}
 						return
@@ -144,7 +144,7 @@ func makeGroupBy(
 				base.Debug("selectTokenRow", gr.selectAgg.TokenRow)
 				if b, err := gr.havingAgg.RenderExpression(HavingBuilder.Expr); err != nil {
 					select {
-					case gp.out <- GetChanError{err: err}:
+					case gp.out <- base.GetChanError{Err: err}:
 					case <-ctx.Done():
 					}
 					return
@@ -154,7 +154,7 @@ func makeGroupBy(
 							gp.so.AddRow(gr.selectAgg.TokenRow, sr)
 						} else {
 							select {
-							case gp.out <- GetChanError{sr, nil}:
+							case gp.out <- base.GetChanError{sr, nil}:
 							case <-ctx.Done():
 								return
 							}

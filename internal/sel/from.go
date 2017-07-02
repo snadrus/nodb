@@ -16,7 +16,7 @@ type from struct {
 	src          base.SrcTables
 	joinElements []*joinElement
 	exprBuilder  *expr.ExpressionBuilder
-	obj          Obj
+	obj          base.Obj
 }
 type joinElement struct {
 	from       *joinElement // left side, or NULL if that would be us.
@@ -114,7 +114,7 @@ func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) 
 				s.Index(0).Set(vo)
 				mySrcTable.Table = base.NewSliceOfStructRP(s.Interface())
 			} else { // TODO support []map[string]interface{} / chan
-				return nil, fmt.Errorf("unsupported type for table", string(name))
+				return nil, fmt.Errorf("unsupported type for table %s", string(name))
 			}
 
 			// TODO MAKE SAFER FOR NULLS
@@ -136,7 +136,12 @@ func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) 
 			f.joinElements = append(f.joinElements, j)
 			return j, nil
 		case *sqlparser.Subquery:
-			// TODO run it & get back a channel  / DoGetChan()....
+			//sub := aliasedTable.Expr.(*sqlparser.Subquery).Select
+			//chOut, chCol := GetChan(sub,f.obj, context.Background())
+			// TODO Determine struct shape
+			go func() {
+				// TODO live-convert structs for the row-provider.
+			}()
 			return nil, fmt.Errorf("Subquery not implemented. TODO!!")
 		}
 
@@ -172,11 +177,11 @@ func (f *from) Do(t []sqlparser.TableExpr) error {
 	return nil
 }
 
-func fromer(exprs sqlparser.TableExprs, obj Obj) (base.SrcTables, []*joinElement, error) {
+func fromer(exprs sqlparser.TableExprs, obj base.Obj) (base.SrcTables, []*joinElement, error) {
 	myFrom := from{
 		src: base.SrcTables{},
 		obj: obj,
 	}
-	myFrom.exprBuilder = expr.DefaultBuilder.Dup().Setup(myFrom.src, obj)
+	myFrom.exprBuilder = expr.DefaultBuilder.Dup().Setup(myFrom.src, obj, GetChan)
 	return myFrom.src, myFrom.joinElements, myFrom.Do(exprs)
 }
