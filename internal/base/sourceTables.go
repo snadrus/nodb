@@ -10,7 +10,7 @@ type RowProvider interface {
 	GetInfo() (multiPassCost int)
 	SetConfig(multiPass bool) /* FUTURE: indexes */
 	NextRow() (hasNotLooped bool)
-	GetFields(used map[string]bool, addPrefix string, dest map[string]interface{})
+	GetFields(used map[string]bool, addPrefix string, dest map[string]interface{}) error
 }
 
 type SrcTable struct {

@@ -189,7 +189,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src base.Obj, ctx context.Contex
 			}
 			chColNames <- colNames
 
-			plan, err := planQuery(outputTypes, joins, condition(WhereBuilder.Expr), sourceTables, ctx)
+			plan, err := planQuery(outputTypes, joins, condition(WhereBuilder.Expr), sourceTables, ctx, cancelCtx)
 			if err != nil {
 				return fmt.Errorf("Plan err: %v", err)
 			}
@@ -284,6 +284,7 @@ func GetChan(selStmt sqlparser.SelectStatement, src base.Obj, ctx context.Contex
 		err := chReturnSimple() // easier err handling
 		if err != nil {
 			ch <- base.GetChanError{nil, err}
+			chColNames <- []string{} // oft waited-on first
 		}
 		close(ch) //Lets CH redefined by Limit
 	}()

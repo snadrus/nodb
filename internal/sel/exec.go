@@ -2,6 +2,7 @@ package sel
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/kr/pretty"
 	"github.com/snadrus/nodb/internal/base"
@@ -26,7 +27,7 @@ func rowDup(m row) row {
 	}
 	return myMap
 }
-func doNest(je *joinElement, ctx context.Context) chainType {
+func doNest(je *joinElement, ctx context.Context, cancelFunc CancelWithError) chainType {
 	ch := make(chainType, 5)
 	je.resultChan = ch
 	go func() {
@@ -52,11 +53,14 @@ func doNest(je *joinElement, ctx context.Context) chainType {
 			for je.table.Table.NextRow() { // for every row in my table
 				myMap := rowDup(m)
 
-				je.table.Table.GetFields(je.table.UsedFields, tname+".", myMap)
+				err := je.table.Table.GetFields(je.table.UsedFields, tname+".", myMap)
+				if err != nil {
+					cancelFunc(err)
+				}
 
 				r, err := je.condition(myMap)
 				if err != nil {
-					base.Debug("JOIN Error. Should have return path!")
+					cancelFunc(fmt.Errorf("JOIN Error, %s", err.Error()))
 				}
 				if r.(bool) {
 					base.Debug("JOIN Condition true for ", myMap)

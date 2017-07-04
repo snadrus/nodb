@@ -16,14 +16,18 @@ type plan struct {
 	GroupProcessor *groupProcessor
 	so             *orderBySortable
 	context.Context
+	CancelCtx context.CancelFunc
 }
 
-func planQuery(out rowMaker, joins []*joinElement, whereCond condition, src base.SrcTables, ctx context.Context) (*plan, error) {
+type CancelWithError func(e error)
+
+func planQuery(out rowMaker, joins []*joinElement, whereCond condition, src base.SrcTables, ctx context.Context, cancelCtx context.CancelFunc) (*plan, error) {
 	return &plan{
-		rowMaker: out,
-		joins:    joins,
-		where:    whereCond,
-		Context:  ctx,
+		rowMaker:  out,
+		joins:     joins,
+		where:     whereCond,
+		Context:   ctx,
+		CancelCtx: cancelCtx,
 	}, nil
 }
 
@@ -32,8 +36,12 @@ type chainType chan row
 
 // Run a query plan
 func (p *plan) Run(ch chan base.GetChanError) {
+	cancelWithError := func(e error) {
+		ch <- base.GetChanError{nil, e}
+		p.CancelCtx()
+	}
 	for _, joinStep := range p.joins {
-		doNest(joinStep, p.Context) // x*y strategy. Better ones later
+		doNest(joinStep, p.Context, cancelWithError) // x*y strategy. Better ones later
 	}
 
 	if p.GroupProcessor != nil {

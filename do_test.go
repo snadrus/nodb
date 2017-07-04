@@ -299,16 +299,15 @@ func Test_WhereSubquery(t *testing.T) {
 	})
 }
 
-/*
 func Test_FromSubquery(t *testing.T) {
 	Convey("Simple Subquery", t, func() {
 		result := []Foo{}
-		So(Do("SELECT a FROM first JOIN (SELECT * FROM second) ON first.A=second.A",
+		So(Do("SELECT a FROM first JOIN (SELECT * FROM second) AS third ON first.A=third.A",
 			&result,
 			Obj{"first": left, "second": right}), ShouldBeNil)
 		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})
 	})
-}*/
+}
 func TestSingleSturct(t *testing.T) {
 	Convey("Single Struct Table", t, func() {
 		result := []Foo{}

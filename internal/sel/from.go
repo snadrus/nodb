@@ -1,12 +1,14 @@
 package sel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/fatih/structs"
+	"github.com/kr/pretty"
 	"github.com/snadrus/nodb/internal/base"
 	"github.com/snadrus/nodb/internal/expr"
 	"github.com/xwb1989/sqlparser"
@@ -145,13 +147,42 @@ func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) 
 			f.joinElements = append(f.joinElements, j)
 			return j, nil
 		case *sqlparser.Subquery:
-			//sub := aliasedTable.Expr.(*sqlparser.Subquery).Select
-			//chOut, chCol := GetChan(sub,f.obj, context.Background())
-			// TODO Determine struct shape
+			sub := aliasedTable.Expr.(*sqlparser.Subquery)
+			chOut, chCol := GetChan(sub.Select, f.obj, context.Background())
+			// Determine struct shape
+			fields := []reflect.StructField{}
+			fieldNames := <-chCol
+			for _, v := range fieldNames {
+				fields = append(fields, reflect.StructField{Name: v, Type: reflect.TypeOf([]interface{}{}).Elem()})
+			}
+			symChan := reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.StructOf(fields)), 0)
+			rp := base.NewChanOfStructRP(symChan.Interface())
 			go func() {
-				// TODO live-convert structs for the row-provider.
+				defer symChan.Close()
+				// live-convert structs for the row-provider.
+				for resMap := range chOut {
+					if resMap.Err != nil {
+						rp.(base.CanSetError).SetError(resMap.Err)
+						return // TODO how to pass error up?
+					}
+					s := reflect.New(reflect.StructOf(fields)).Elem()
+					for i, v := range resMap.Item {
+						s.FieldByIndex([]int{i}).Set(reflect.ValueOf(v))
+					}
+					base.Debug("subquery FROM sending ", pretty.Sprint(s))
+					symChan.Send(s)
+				}
 			}()
-			return nil, fmt.Errorf("Subquery not implemented. TODO!!")
+			t := &base.SrcTable{
+				Table:      rp,
+				Name:       string(aliasedTable.As),
+				UsedFields: map[string]bool{},
+				Fields:     fieldNames,
+			}
+			f.src[t.Name] = t
+			j := &joinElement{table: t}
+			f.joinElements = append(f.joinElements, j)
+			return j, nil
 		}
 
 	case *sqlparser.ParenTableExpr:

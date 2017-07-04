@@ -91,19 +91,7 @@ TODO:
   -- WHERE clause per-table first IF this table is involved in it.
   -- MAPS for ON relation (presume unique, work if not unique)
 
-- Cleanup: hide behind enableLogging()
-
 - Subquery 
--- base.rowProvider:  chan interface{} RP: map GetChan to that.
---  Setup a subquery return:
-      reflect.StructOf([]reflect.StructField{
-        {                       // * the number of fields
-          Name: "A",
-          Type: reflect.TypeOf(interface{}{}),
-        }
-      })
--- Support FROM.  // WHERE clause subqueries are done
--- Build own structs for results & reuse what we have.
 
 - DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
 

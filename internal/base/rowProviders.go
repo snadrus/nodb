@@ -1,6 +1,9 @@
 package base
 
-import "reflect"
+import (
+	"reflect"
+	"sync"
+)
 
 type SliceOfStructRowProvider struct {
 	t          reflect.Value
@@ -34,11 +37,12 @@ func (s *SliceOfStructRowProvider) NextRow() (hasNotLooped bool) {
 	}
 	return s.currentRow != 0
 }
-func (s *SliceOfStructRowProvider) GetFields(used map[string]bool, addPrefix string, dest map[string]interface{}) {
+func (s *SliceOfStructRowProvider) GetFields(used map[string]bool, addPrefix string, dest map[string]interface{}) error {
 	myrow := s.t.Index(s.currentRow) // TODO interface this to allow other tables / locks
 	for name := range used {         // copy my useful fields
 		dest[addPrefix+name] = myrow.FieldByName(name).Interface()
 	}
+	return nil
 }
 
 type ChanOfStructRowProvider struct {
@@ -49,6 +53,8 @@ type ChanOfStructRowProvider struct {
 	channelReading bool          // first .Next() and each-loop .Next() is called 1x too much
 	fellOffEnd     bool
 	Saved          []reflect.Value
+	sync.Mutex
+	mutexedErr error
 }
 
 func NewChanOfStructRP(chanOfStruct interface{}) RowProvider {
@@ -81,12 +87,17 @@ func (c *ChanOfStructRowProvider) NextRow() (hasNotLooped bool) {
 			}
 		} else {
 			c.fellOffEnd = true
+			Debug("got to end of input chan")
 			return false
 		}
 	} else {
 		if c.fellOffEnd {
+			if c.Saved == nil || len(c.Saved) == 0 {
+				return false
+			}
 			c.fellOffEnd = false // we only want to report it once
 			c.channelReading = false
+
 			c.currentRow = 0
 			return true
 		}
@@ -98,11 +109,24 @@ func (c *ChanOfStructRowProvider) NextRow() (hasNotLooped bool) {
 	}
 	return true
 }
-func (c *ChanOfStructRowProvider) GetFields(used map[string]bool, addPrefix string, dest map[string]interface{}) {
+func (c *ChanOfStructRowProvider) GetFields(used map[string]bool, addPrefix string, dest map[string]interface{}) error {
 	if !c.channelReading {
 		c.currentRowVal = c.Saved[c.currentRow]
 	}
 	for name := range used { // copy my useful fields
 		dest[addPrefix+name] = c.currentRowVal.FieldByName(name).Interface()
 	}
+	c.Lock()
+	defer c.Unlock()
+	return c.mutexedErr
+}
+
+func (c *ChanOfStructRowProvider) SetError(e error) {
+	c.Mutex.Lock()
+	c.mutexedErr = e
+	c.Mutex.Unlock()
+}
+
+type CanSetError interface {
+	SetError(e error)
 }
