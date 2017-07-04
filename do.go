@@ -41,3 +41,7 @@ func Filter(query string, result interface{}, input interface{}) error {
 	return Do(fmt.Sprintf("SELECT * FROM t0 WHERE %s", query),
 		result, Obj{"t0": input})
 }
+
+func EnableLogging() {
+	base.Debug = fmt.Println
+}

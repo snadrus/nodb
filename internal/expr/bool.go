@@ -169,29 +169,29 @@ func makeNot(e_tmp E) E {
 func makeOr(left, right E) E {
 	return func(row map[string]interface{}) (val interface{}, err error) {
 		for _, fn := range []E{left, right} {
-			res, err := fn(row)
+			res, err2 := fn(row)
 			if err != nil || res == nil {
-				return nil, err
+				err = err2 // error & true should be true.
 			}
 			if res.(bool) == true {
 				return true, nil
 			}
 		}
-		return false, nil
+		return false, err
 	}
 }
 
 func makeAnd(left, right E) E {
 	return func(row map[string]interface{}) (val interface{}, err error) {
 		for _, fn := range []E{left, right} {
-			res, err := fn(row)
+			res, err2 := fn(row)
 			if err != nil || res == nil {
-				return nil, err
+				err = err2 // error && false should be false.
 			}
 			if res.(bool) == false {
 				return false, nil
 			}
 		}
-		return true, nil
+		return true, err
 	}
 }

@@ -32,8 +32,8 @@ type chainType chan row
 
 // Run a query plan
 func (p *plan) Run(ch chan base.GetChanError) {
-	for _, t := range p.joins {
-		doNest(t, p.Context) // x*y strategy. Better ones later
+	for _, joinStep := range p.joins {
+		doNest(joinStep, p.Context) // x*y strategy. Better ones later
 	}
 
 	if p.GroupProcessor != nil {

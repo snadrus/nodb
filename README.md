@@ -4,8 +4,10 @@ SQL array comprehensions in Go. [![GoDoc](http://img.shields.io/badge/go-documen
 - Great for complex in-memory caches, or in-memory joins across various datastores
 - Development faster than in-memory DBs: no table creation, inserts, IPC, & de/serialization
 - Sort: "ORDER BY last_name, importance DESC" is a dream vs Go's sort API
-- Every struct is a table row. A slice of them is a table.
-- Pass in & use any func. time.Time is your time format.
+- Every struct is a table row. A (slice OR chan) of them is a table.
+  -- chan tables will cache to a slice as needed. (Today to avoid caching, it needs to be the first table & no subsequent Right join)
+- Pass in & use any func. time.Time is your time format. 
+- Use any types you want, just provide & use the functions you needed.
 
 Only 1 function! Example:
 
@@ -88,6 +90,8 @@ TODO:
   -- HARD: Make it just as efficient: 
   -- WHERE clause per-table first IF this table is involved in it.
   -- MAPS for ON relation (presume unique, work if not unique)
+
+- Cleanup: hide behind enableLogging()
 
 - Subquery 
 -- base.rowProvider:  chan interface{} RP: map GetChan to that.

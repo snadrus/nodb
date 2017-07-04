@@ -21,6 +21,9 @@ type onlyA struct {
 	A int
 }
 
+func init() {
+	EnableLogging()
+}
 func Test_Easiest(t *testing.T) {
 	src := []Foo{{1, "hello"}, {2, "world"}}
 	Convey("get all", t, func() {
@@ -285,11 +288,50 @@ func Test_Filter(t *testing.T) {
 	})
 }
 
-func Test_Subquery(t *testing.T) {
+func Test_WhereSubquery(t *testing.T) {
 	Convey("Simple Subquery", t, func() {
 		result := []Foo{}
 		So(Do("SELECT a FROM first WHERE first.a IN ("+
 			"SELECT a from second)",
+			&result,
+			Obj{"first": left, "second": right}), ShouldBeNil)
+		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})
+	})
+}
+
+/*
+func Test_FromSubquery(t *testing.T) {
+	Convey("Simple Subquery", t, func() {
+		result := []Foo{}
+		So(Do("SELECT a FROM first JOIN (SELECT * FROM second) ON first.A=second.A",
+			&result,
+			Obj{"first": left, "second": right}), ShouldBeNil)
+		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})
+	})
+}*/
+func TestSingleSturct(t *testing.T) {
+	Convey("Single Struct Table", t, func() {
+		result := []Foo{}
+		orig := []Foo{{1, "A"}, {2, "B"}, {3, "C"}}
+		So(Do("SELECT * from orig", &result, Obj{"orig": orig}), ShouldBeNil)
+		So(result, ShouldResemble, orig)
+	})
+}
+func Test_Channel_Query(t *testing.T) {
+	Convey("Channel Join", t, func() {
+		result := []Foo{}
+
+		left := make(chan Foo, 3)
+		right := make(chan Foo, 3)
+		left <- Foo{1, "A"}
+		left <- Foo{2, "B"}
+		left <- Foo{3, "C"}
+		close(left)
+		right <- Foo{2, "X"}
+		right <- Foo{3, "Y"}
+		right <- Foo{4, "Z"}
+		close(right)
+		So(Do("SELECT a FROM first JOIN second ON first.A=second.A",
 			&result,
 			Obj{"first": left, "second": right}), ShouldBeNil)
 		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})

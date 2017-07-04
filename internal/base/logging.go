@@ -1,6 +1,4 @@
 package base
 
-import "fmt"
-
-// Debug should equal fmt.Println for in-depth debug
-var Debug = fmt.Println //func(i ...interface{}) {}
+// Debug using fmt.Println. Call nodb.EnableLogging()
+var Debug = func(i ...interface{}) (int, error) { return 0, nil }

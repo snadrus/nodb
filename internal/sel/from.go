@@ -107,18 +107,27 @@ func (f *from) MakeJoinElement(table sqlparser.TableExpr) (*joinElement, error) 
 
 			vo := reflect.ValueOf(tdata)
 			kind := vo.Kind()
-			if kind == reflect.Slice && vo.Index(0).Kind() == reflect.Struct {
+			var structForFieldWalking interface{}
+			if kind == reflect.Slice && vo.Type().Elem().Kind() == reflect.Struct {
 				mySrcTable.Table = base.NewSliceOfStructRP(tdata)
+				structForFieldWalking = reflect.New(vo.Type().Elem()).Interface()
 			} else if kind == reflect.Struct {
 				s := reflect.MakeSlice(reflect.SliceOf(vo.Type()), 1, 1)
 				s.Index(0).Set(vo)
 				mySrcTable.Table = base.NewSliceOfStructRP(s.Interface())
-			} else { // TODO support []map[string]interface{} / chan
+				structForFieldWalking = tdata
+			} else if kind == reflect.Chan {
+				if reflect.TypeOf(tdata).Elem().Kind() != reflect.Struct {
+					return nil, fmt.Errorf("Channel tables can only be of structs, TODO fixme")
+				}
+				mySrcTable.Table = base.NewChanOfStructRP(tdata)
+				structForFieldWalking = reflect.New(vo.Type().Elem()).Interface()
+			} else { // TODO support []map[string]interface{}
 				return nil, fmt.Errorf("unsupported type for table %s", string(name))
 			}
 
 			// TODO MAKE SAFER FOR NULLS
-			for _, f := range structs.Fields(vo.Index(0).Interface()) {
+			for _, f := range structs.Fields(structForFieldWalking) {
 				if f.IsExported() {
 					mySrcTable.Fields = append(mySrcTable.Fields, f.Name())
 				} else {

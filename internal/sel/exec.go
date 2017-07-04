@@ -36,6 +36,7 @@ func doNest(je *joinElement, ctx context.Context) chainType {
 			prev = getInitialRow()
 		} else {
 			prev = je.from.resultChan
+			je.table.Table.SetConfig(true)
 		}
 		if je.condition == nil {
 			je.condition = goodCondition
@@ -46,7 +47,7 @@ func doNest(je *joinElement, ctx context.Context) chainType {
 		base.Debug("DONEST for ", pretty.Sprint(tname))
 		// TODO PERF apply flat conditions
 		for m := range prev {
-			// TODO Accuracy Handle Full Join
+			// Handle Full Join
 			joined = false
 			for je.table.Table.NextRow() { // for every row in my table
 				myMap := rowDup(m)
