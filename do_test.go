@@ -436,3 +436,11 @@ func Test_CountDistinct(t *testing.T) {
 		So(r, ShouldResemble, []CountRes{{4}})
 	})
 }
+
+func Test_Distinct(t *testing.T) {
+	Convey("CountDistinct", t, func() {
+		var r []CountRes
+		So(Inline(&r, "SELECT DISTINCT a AS count FROM (SELECT * FROM ", left, " UNION  SELECT * FROM", right, ") ORDER BY a"), ShouldBeNil)
+		So(r, ShouldResemble, []CountRes{{1}, {2}, {3}, {4}})
+	})
+}

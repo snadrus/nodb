@@ -8,6 +8,7 @@ import (
 	"io"
 	"reflect"
 
+	"github.com/kr/pretty"
 	"github.com/mitchellh/mapstructure"
 	"github.com/snadrus/nodb/internal/base"
 	"github.com/snadrus/nodb/internal/expr"
@@ -235,6 +236,39 @@ func GetChan(selStmt sqlparser.SelectStatement, src base.Obj, ctx context.Contex
 				plan.MakeOrderBy(so)
 			}
 
+			if tree.Distinct != "" {
+				out := ch
+				ch = make(chan base.GetChanError)
+				go func() {
+					defer close(out)
+					done := ctx.Done() // an error
+					already := map[string]bool{}
+					var stringver string
+					var ok bool
+					var v base.GetChanError
+					for {
+						select {
+						case v, ok = <-ch:
+							if v.Err != nil {
+								out <- v
+								return
+							}
+							if !ok {
+								return
+							}
+							stringver = pretty.Sprint(v)
+							if _, ok = already[stringver]; ok {
+								continue
+							}
+							out <- v
+							already[stringver] = true
+						case <-done:
+							return
+						}
+					}
+				}()
+			}
+
 			if tree.Limit != nil {
 				out := ch
 				ch = make(chan base.GetChanError)
@@ -272,8 +306,8 @@ func GetChan(selStmt sqlparser.SelectStatement, src base.Obj, ctx context.Contex
 					cancelCtx()
 				}()
 			}
-			if tree.Lock != "" || tree.Distinct != "" {
-				return errors.New("No support for Limit, Lock, or Distinct")
+			if tree.Lock != "" {
+				return errors.New("No support for Lock")
 			}
 
 			selRemoveNamedItemsTable(sourceTables)

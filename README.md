@@ -64,8 +64,10 @@ FAQ:
   * It's the personal efforts of Andrew Jackson who also had the idea.
 - How fast really?
   * It is in-memory & pipelined for multicore. Correctness first, query planning second.
-- Memory Gotchas:
-  * Object copying isn't light. GROUPBY is even heavier.
+  * 30-year-optimized DBs mostly win with on-disk layout & permanent indexes. Neither makes sense here.
+  * Lots of work is possible in query planner stage to make use of special circumstances.
+- Memory Risk:
+  * Object copying isn't light. GROUPBY/DISTINCT/ORDER_BY is even heavier.
 
 Design: (the first?) 100% Go SQL engine
   Go libs for SQL parsing and interface{} evaluating.
@@ -81,10 +83,9 @@ Recently Added:
  - Subqueries 
  - chan (struct) Tables. If it's the first table, it also won't cache
  - SELECT count(distinct __)
+ - DISTINCT (whole SELECT row)
 
 TODO:
-- SELECT DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
-
 - Functions in WHERE clause
   -- Needs parser upgrades to be used in WHERE clauses
 
@@ -105,9 +106,8 @@ TODO:
 - DB Proxy (Cassandra or a variety at once)
 -- SubQueries + mmap for JOIN/GROUP intermediaries
 
-
-- OPTIMIZATION: expr.E fault tolerance (error swallowing) for OR/AND clauses allowing Per-table elimination of rows without all data available:  A AND B => err AND False ==> False.  A OR B ==> err OR True ==> True.
--- THEN: make errored expr.E returns include partial eval.
+- OPTIMIZATION: Per-table elimination of rows without all data available: 
+-- THEN: make errored expr.E returns include partial eval. <-- bad idea. No way to combine. Overhead
 
 - OPTIMIZATION: RowMap["1Prototype"] pointing to previous map. Reduces join effort.
     BETTER: have a .GetValue("name") function that works on all the various types.
@@ -122,11 +122,11 @@ TODO:
   - Aides planner in slicing-up processing
   - OPTIMIZATION: pre-determine the table rows that match the WHERE query.
 
-- Time: range queries and gt/lt on time objects. also needs way to static-define a time object (like a time function) --> more MySQL time functions
-
 - Planner v2: run short-circuit expr, then recurse.
   Medium: just left-align those with indexes. leftist for 1 channel
 
 - Joiner: hard-version:
   - if you're an inner loop, consider marking those you skip
   - if unsorted & "equals" join, map or sort
+
+- MEM exhaustion risk: group/distinct/orderby mmaped hashes. (MEDIUM)
