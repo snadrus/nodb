@@ -280,6 +280,43 @@ func Test_Func1(t *testing.T) {
 		So(res, ShouldResemble, []Foo{{1, "ELL"}})
 	})
 }
+func Test_FuncCustom(t *testing.T) {
+	Convey("custom func", t, func() {
+		res := []Foo{}
+		So(Do("SELECT A, myfunc(UPPER(B), 1, 3) AS B FROM srcG WHERE A = 1",
+			&res,
+			Obj{"srcG": srcG,
+				"myfunc": func(s string, i, j int) string {
+					return s[i : i+j]
+				}}), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{1, "ELL"}})
+	})
+}
+
+/* PARSER cannot do this
+func Test_Func1Where(t *testing.T) {
+	Convey("function where", t, func() {
+		res := []Foo{}
+		So(Do("SELECT A, SUBSTR(UPPER(B), 1, 3) AS B FROM srcG WHERE SUBSTR(UPPER(B), 1, 3)='ELL'",
+			&res,
+			Obj{"srcG": srcG}), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{1, "ELL"}})
+	})
+}
+
+func Test_FuncCustomWhere(t *testing.T) {
+	Convey("custom funcWhere", t, func() {
+		res := []Foo{}
+		So(Do("SELECT A, myfunc(UPPER(B), 1, 3) AS B FROM srcG WHERE myfunc(UPPER(B), 1, 3)='ELL'",
+			&res,
+			Obj{"srcG": srcG,
+				"myfunc": func(s string, i, j int) string {
+					return s[i : i+j]
+				}}), ShouldBeNil)
+		So(res, ShouldResemble, []Foo{{1, "ELL"}})
+	})
+}
+*/
 func Test_Filter(t *testing.T) {
 	Convey("filter", t, func() {
 		res := []Foo{}
@@ -334,5 +371,68 @@ func Test_Channel_Query(t *testing.T) {
 			&result,
 			Obj{"first": left, "second": right}), ShouldBeNil)
 		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})
+	})
+}
+
+type CustomerEntry struct {
+	ID     int
+	Name   string
+	Email  string
+	Gender string
+}
+type OrderEntry struct {
+	Total         float64
+	CustID        int
+	WhenCompleted time.Time
+}
+
+type custResultType []struct {
+	Who          string
+	Email        string
+	MonthlyTotal float64
+}
+
+func Test_Inline(t *testing.T) {
+	Convey("Inline", t, func() {
+		result := []Foo{}
+		So(Inline(&result, "SELECT a FROM ", left, " AS first JOIN ", right, " AS second ON first.A=second.A"), ShouldBeNil)
+		So(result, ShouldResemble, []Foo{{2, ""}, {3, ""}})
+	})
+	Convey("Demo", t, func() {
+		customer := []CustomerEntry{
+			{1, "Bob", "b@ob.com", "m"},
+			{2, "Best", "b@est.com", "f"},
+			{3, "Nope", "n@ope.com", "m"}}
+		order := []OrderEntry{
+			{50.0, 1, time.Now()},
+			{100, 3, time.Date(1980, 1, 1, 0, 0, 0, 0, time.Local)},
+			{30.0, 2, time.Now()},
+			{25.0, 2, time.Now()},
+		}
+		var results custResultType
+		err := Inline(&results,
+			"SELECT email, SUM(o.total) AS monthlyTotal,",
+			func(g string) string { return map[string]string{"m": "Mr. ", "f": "Ms. "}[g] },
+			"(gender) + name AS who",
+			"FROM", customer, "AS cust JOIN", order, "AS o ON cust.id=o.custID",
+			"WHERE",
+			" o.whenCompleted > ", time.Now().Add(-30*24*time.Hour),
+			"GROUP BY cust.id",
+			"ORDER BY monthlyTotal DESC",
+			"LIMIT 10")
+		So(err, ShouldBeNil)
+		So(results, ShouldResemble, custResultType{{"Ms. Best", "b@est.com", 55}, {"Mr. Bob", "b@ob.com", 50}})
+	})
+}
+
+type CountRes struct {
+	Count int
+}
+
+func Test_CountDistinct(t *testing.T) {
+	Convey("CountDistinct", t, func() {
+		var r []CountRes
+		So(Inline(&r, "SELECT COUNT(DISTINCT a) AS count FROM (SELECT * FROM ", left, " UNION  SELECT * FROM", right, ")"), ShouldBeNil)
+		So(r, ShouldResemble, []CountRes{{4}})
 	})
 }

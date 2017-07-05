@@ -43,9 +43,12 @@ func (f *from) MakeJoinTree(je *sqlparser.JoinTableExpr) (*joinElement, error) {
 		return nil, err
 	}
 	// TODO the ON clause should only map to these 2 tables (alias) & should be available
-	cnd, err := f.exprBuilder.ExprToE(je.On)
-	if err != nil {
-		return nil, err
+	var cnd expr.E
+	if je.On != nil {
+		cnd, err = f.exprBuilder.ExprToE(je.On)
+		if err != nil {
+			return nil, err
+		}
 	}
 	right.from = left
 	right.condition = cnd

@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/kr/pretty"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -33,6 +34,7 @@ func (e *ExpressionBuilder) MakeAgg(fe *sqlparser.FuncExpr, ag func(E) AggProces
 		if string(fe.Name) != "count" {
 			return nil, fmt.Errorf("Star in Func ?")
 		}
+		argE = func(m map[string]interface{}) (interface{}, error) { return m, nil }
 	} else {
 		var err error
 		argE, err = e.ExprToE(fe.Exprs[0].(*sqlparser.NonStarExpr).Expr)
@@ -111,11 +113,12 @@ func (g *AggGroup) RenderExpression(E E) (interface{}, error) {
 // TODO handle aggregate functions by saving an array
 // Because:  HAVING sum(x) > sum(y)
 var aggFuncs = map[string]func(E) AggProcessing{
-	"count": newAggCount,
-	"avg":   newAggAvg,
-	"min":   newAggMin,
-	"max":   newAggMax,
-	"sum":   newAggSum,
+	"count":         newAggCount,
+	"countdistinct": newAggCountDistinct,
+	"avg":           newAggAvg,
+	"min":           newAggMin,
+	"max":           newAggMax,
+	"sum":           newAggSum,
 }
 
 func newAggCount(e E) AggProcessing {
@@ -139,6 +142,40 @@ func (a *AggCount) Value(vp interface{}) (res interface{}) {
 	return vp.(*AggCountData).i
 }
 
+//////////
+func newAggCountDistinct(e E) AggProcessing {
+	return &AggCountDistinct{e}
+}
+
+type AggCountDistinct struct{ E }
+
+type AggCountDistinctData struct {
+	i       int
+	already map[string]bool
+}
+
+func (a *AggCountDistinct) Initial() interface{} {
+	return &AggCountDistinctData{already: map[string]bool{}}
+}
+func (a *AggCountDistinct) Incr(row map[string]interface{}, vp interface{}) error {
+	vI, err := a.E(row)
+	if err != nil {
+		return err
+	}
+	rep := pretty.Sprint(vI) // need all sub-levels too, in case of * row
+
+	if _, exists := vp.(*AggCountDistinctData).already[rep]; exists {
+		return nil
+	}
+	vp.(*AggCountDistinctData).already[rep] = true
+	vp.(*AggCountDistinctData).i++
+	return nil
+}
+func (a *AggCountDistinct) Value(vp interface{}) (res interface{}) {
+	return vp.(*AggCountDistinctData).i
+}
+
+//////////
 func newAggMax(e E) AggProcessing {
 	return &AggMax{E: e}
 }

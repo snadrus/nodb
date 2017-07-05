@@ -2,29 +2,29 @@
 SQL array comprehensions in Go. [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/snadrus/nodb)        [![Build Status](http://img.shields.io/travis/snadrus/nodb.svg?style=flat-square)](https://travis-ci.org/snadrus/nodb)     [![Coverage Status](https://coveralls.io/repos/github/snadrus/nodb/badge.svg?branch=master)](https://coveralls.io/github/snadrus/nodb?branch=master)    [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=C6284X93YL4WA)
 
 - Great for complex in-memory caches, or in-memory joins across various datastores
-- Development faster than in-memory DBs: no table creation, inserts, IPC, & de/serialization
-- Sort: "ORDER BY last_name, importance DESC" is a dream vs Go's sort API
+- Development faster than in-memory DBs: no table creation, inserts, IPC, CGO or de/serialization
+- Sort Easily: "ORDER BY last_name, importance DESC"
 - Every struct is a table row. A (slice OR chan) of them is a table.
   -- chan tables will cache to a slice as needed. (Today to avoid caching, it needs to be the first table & no subsequent Right join)
 - Pass in & use any func. time.Time is your time format. 
 - Use any types you want, just provide & use the functions you needed.
 
-Only 1 function! Example:
+Example:
 
-     err := nodb.Do(
-       "SELECT *, salutation(gender, last_name, lang) as greeting" +
-       "FROM user JOIN company AS t2 ON user.company_id = t2.id" +
-       "WHERE company.size = 'medium' " +
-       "ORDER BY company.name",
-       &resultSliceOfAnyStruct,
-       nodb.Obj{
-          "user": userCache,     // A slice of any struct
-          "company": companies, // A slice of any struct
-          "salutation": mySalutationFunc,    // Pass string-returning functions
-          }
-     )
-
-     If no error, the results' structs will contain shallow-copies of their elements.
+    // Lets thank our 10 biggest customers this month:
+    var results []struct{
+      Name string
+      Email string
+      MonthlyTotal float64
+    }
+    err := nodb.Inline(&results, 
+        "SELECT name, email, SUM(o.total) AS monthlyTotal",
+        "FROM", customer,"AS cust JOIN", order,"AS o ON cust.id=o.custID",
+        "WHERE o.whenCompleted > ", time.Now().Add(-30*24*time.Hour),
+        "GROUP BY cust.id",
+        "ORDER BY monthlyTotal DESC",
+        "LIMIT 10")
+    // If no error: the results' structs will contain shallow-copies of their elements.
 
 
 DB Driver method:
@@ -57,8 +57,9 @@ FAQ:
 - How can I help?
   * Open a bug in github.org/snadrus/nodb and send a merge request.
 - Types?
-  * Are GoLang types. Use Golang time & pass-in functions:
+  * Are GoLang types. Pass-in functions:
       func Hour(t time.Time) int { return t.Hour() }
+  * Time renders as UnixNano() for comparison/arithmatic/etc including time.Duration
 - Where did this come from?
   * It's the personal efforts of Andrew Jackson who also had the idea.
 - How fast really?
@@ -77,25 +78,21 @@ Design: (the first?) 100% Go SQL engine
   Closures are the greatest! The setups return functions that have context.
 
 Recently Added: 
- - Subqueries in WHERE clause
-
-Lacking, but has easy workarounds:
-    - Inputs other than []struct
+ - Subqueries 
+ - chan (struct) Tables. If it's the first table, it also won't cache
+ - SELECT count(distinct __)
 
 TODO:
--  nodb.Inline(
-  "SELECT customer.Name as Name, customer.Phone AS Phone FROM ",         customers," AS customers JOIN ", 
-  invoice, " AS invoice ON customer.id = invoice.customer_id " +
-  "WHERE invoice.status='PENDING' ")
-  -- HARD: Make it just as efficient: 
+- SELECT DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
+
+- Functions in WHERE clause
+  -- Needs parser upgrades to be used in WHERE clauses
+
+-  Perf:
   -- WHERE clause per-table first IF this table is involved in it.
   -- MAPS for ON relation (presume unique, work if not unique)
 
-- Subquery 
-
-- DISTINCT not implemented. It is mmaped hashes. (MEDIUM)
-
-- enable parentheses joins. 
+- Parentheses joins. 
     Build a joinElement without a left, but keep its append order
 
 - NULL (nil) support is wonky at best. Avoid if possible.
@@ -103,6 +100,7 @@ TODO:
 - TODOs in the code.
 
 - Functions on objects: Hour(t) --> t.Hour()
+  -- Needs parser upgrades to be used in WHERE clauses
 
 - DB Proxy (Cassandra or a variety at once)
 -- SubQueries + mmap for JOIN/GROUP intermediaries

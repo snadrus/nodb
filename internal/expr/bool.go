@@ -101,6 +101,7 @@ func (e *ExpressionBuilder) MakeCompare(tree *sqlparser.ComparisonExpr) (E, erro
 	if err != nil {
 		return nil, err
 	}
+
 	return doBinOp(left, ee, right), err
 }
 

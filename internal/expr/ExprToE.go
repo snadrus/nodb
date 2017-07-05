@@ -2,6 +2,7 @@ package expr
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Knetic/govaluate"
 	"github.com/snadrus/nodb/internal/base"
@@ -36,12 +37,18 @@ func doBinOp(l E, op *govaluate.EvaluableExpression, r E) E { // candidate for g
 		if err != nil || right == nil {
 			return right, err
 		}
+		if ltime, ok := left.(time.Time); ok {
+			left = ltime.UnixNano()
+		}
+		if rtime, ok := right.(time.Time); ok {
+			right = rtime.UnixNano()
+		}
 		base.Debug("doing ", op.String(), "on", left, "and", right)
 		return op.Evaluate(map[string]interface{}{"l": left, "r": right})
 	}
 }
 
-// ExprToE converts a parsed expression into a runnable one. 
+// ExprToE converts a parsed expression into a runnable one.
 func (e *ExpressionBuilder) ExprToE(tree sqlparser.Expr) (E, error) {
 	bla := tree.(interface{})
 	v, ok := bla.(sqlparser.ValExpr)

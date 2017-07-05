@@ -16,7 +16,10 @@ import (
 func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 	argString := string(fe.Name)
 	if fe.Distinct {
-		return nil, fmt.Errorf("I don't know what DISTINCT %s should do. TODO Impl", argString)
+		if argString != "count" {
+			return nil, fmt.Errorf("I don't know what DISTINCT %s should do. TODO Impl", argString)
+		}
+		argString = "countdistinct"
 	}
 
 	if af, ok := aggFuncs[argString]; ok {
@@ -40,14 +43,17 @@ func (e *ExpressionBuilder) MakeFunc(fe *sqlparser.FuncExpr) (E, error) {
 	}
 
 	// Allow their own functions (instead of using funcmap)
-	fn, ok := FuncMap[string(fe.Name)]
+	funcMap := FuncMap
+	name := string(fe.Name)
+	fn, ok := FuncMap[name]
 	if !ok {
-		fn, ok = e.Obj[string(fe.Name)]
+		fn, ok = e.Obj[name]
 		if !ok {
-			return nil, fmt.Errorf("Function not found: %s", fe.Name)
+			return nil, fmt.Errorf("Function not found: %s", name)
 		}
+		funcMap = map[string]interface{}{name: fn}
 	}
-	t, _ := template.New("A").Funcs(FuncMap).Parse("{{" + argString + "}}")
+	t, _ := template.New("A").Funcs(funcMap).Parse("{{" + argString + "}}")
 
 	return func(row map[string]interface{}) (i interface{}, err error) {
 		templateVars := make(map[string]interface{}, len(args))
